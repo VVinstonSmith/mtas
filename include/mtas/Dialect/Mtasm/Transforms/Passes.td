@@ -81,4 +81,30 @@ def MultiBuffering : Pass<"mtasm-multi-buffering", "func::FuncOp"> {
   ];
 }
 
+def TileDynamicDims : Pass<"tile-dynamic-dims", "func::FuncOp"> {
+  let summary = "A pass to tile dynamic dimensions";
+  let constructor = "mlir::mtasm::createTileDynamicDimsPass()";
+  let dependentDialects = [
+    "linalg::LinalgDialect",
+    "scf::SCFDialect",
+    "memref::MemRefDialect",
+    "mtasm::MtasmDialect",
+  ];
+}
+
+def LoopUnrolling : Pass<"loop-unrolling", "func::FuncOp"> {
+  let summary = "A pass to unroll the innermost loop";
+  let constructor = "mlir::mtasm::createLoopUnrollingPass()";
+  let dependentDialects = [
+    "linalg::LinalgDialect",
+    "scf::SCFDialect",
+    "memref::MemRefDialect",
+    "mtasm::MtasmDialect",
+  ];
+  let options = [
+    Option<"unrollingFactor", "unrolling-factor", "unsigned", "2", "loop unrolling factor">,
+  ];
+}
+
+
 #endif // MTAS_DIALECT_MTASM_TRANSFORMS_PASSES

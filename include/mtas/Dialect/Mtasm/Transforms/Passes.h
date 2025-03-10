@@ -42,6 +42,12 @@ namespace mtasm {
 /// Create a pass to do multi-buffering
 std::unique_ptr<Pass> createMultiBufferingPass();
 
+/// Create a pass to tile dynamic dimensions
+std::unique_ptr<Pass> createTileDynamicDimsPass();
+
+/// Create a pass to unroll the innermost loop
+std::unique_ptr<Pass> createLoopUnrollingPass();
+
 //===----------------------------------------------------------------------===//
 // Registration
 //===----------------------------------------------------------------------===//
