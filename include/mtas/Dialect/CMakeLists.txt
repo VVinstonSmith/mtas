@@ -1,1 +1,1 @@
-add_subdirectory(Mtasm)
+add_subdirectory(Ftm)

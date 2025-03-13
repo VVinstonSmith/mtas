@@ -1,4 +1,4 @@
-//===- MtasmOps.cpp - Implementation of Mtasm Dialect Ops ---*- C++ -*-===//
+//===- FtmOps.cpp - Implementation of Ftm Dialect Ops ---*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "mtas/Dialect/Mtasm/IR/Mtasm.h"
+#include "mtas/Dialect/Ftm/IR/Ftm.h"
 
 #include "mlir/AsmParser/AsmParser.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -27,15 +27,15 @@
 #include <optional>
 
 using namespace mlir;
-using namespace mlir::mtasm;
+using namespace mlir::ftm;
 
 #define GET_OP_CLASSES
-#include "mtas/Dialect/Mtasm/IR/MtasmOps.cpp.inc"
+#include "mtas/Dialect/Ftm/IR/FtmOps.cpp.inc"
 
 //===----------------------------------------------------------------------===//
-// MtasmDialect
+// FtmDialect
 //===----------------------------------------------------------------------===//
-void MtasmDialect::getCanonicalizationPatterns(
+void FtmDialect::getCanonicalizationPatterns(
     RewritePatternSet &results) const {
-  
+
 }

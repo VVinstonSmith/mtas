@@ -1,4 +1,4 @@
-//===- Mtasm.h - Mt3000 ASM dialect -------------------------*- C++-*-===//
+//===- Ftm.h - Mt3000 ASM dialect -------------------------*- C++-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef MTAS_DIALECT_MTFUSION_IR_MTFUSION_H
-#define MTAS_DIALECT_MTFUSION_IR_MTFUSION_H
+#ifndef MTAS_DIALECT_FTM_IR_FTM_H
+#define MTAS_DIALECT_FTM_IR_FTM_H
 
 #include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -26,38 +26,38 @@
 #include "mlir/Interfaces/TilingInterface.h"
 
 namespace mlir {
-namespace mtasm {
+namespace ftm {
 
-class MtasmOp;
+class FtmOp;
 
-} // namespace mtasm
+} // namespace ftm
 } // namespace mlir
 
 //===----------------------------------------------------------------------===//
-// Mtasm Dialect
+// Ftm Dialect
 //===----------------------------------------------------------------------===//
 
-#include "mtas/Dialect/Mtasm/IR/MtasmOpsDialect.h.inc"
+#include "mtas/Dialect/Ftm/IR/FtmOpsDialect.h.inc"
 
 //===----------------------------------------------------------------------===//
-// Mtasm Enums
+// Ftm Enums
 //===----------------------------------------------------------------------===//
 
-#include "mtas/Dialect/Mtasm/IR/MtasmEnums.h.inc"
+#include "mtas/Dialect/Ftm/IR/FtmEnums.h.inc"
 
 //===----------------------------------------------------------------------===//
-// Mtasm Attributes
+// Ftm Attributes
 //===----------------------------------------------------------------------===//
 
 #define GET_ATTRDEF_CLASSES
-#include "mtas/Dialect/Mtasm/IR/MtasmAttrs.h.inc"
+#include "mtas/Dialect/Ftm/IR/FtmAttrs.h.inc"
 
 //===----------------------------------------------------------------------===//
-// Mtasm Dialect Operations
+// Ftm Dialect Operations
 //===----------------------------------------------------------------------===//
 
 #define GET_OP_CLASSES
-#include "mtas/Dialect/Mtasm/IR/MtasmOps.h.inc"
+#include "mtas/Dialect/Ftm/IR/FtmOps.h.inc"
 
-#endif // MTAS_DIALECT_MTASM_IR_MTASM_H
+#endif // MTAS_DIALECT_FTM_IR_FTM_H
 

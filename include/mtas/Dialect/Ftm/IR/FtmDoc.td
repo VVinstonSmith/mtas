@@ -1,4 +1,4 @@
-//===- MtasmDoc.td - Mtasm documentation -------------*- tablegen -*-===//
+//===- FtmDoc.td - Ftm documentation -------------*- tablegen -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -13,10 +13,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef MTASM_IR_MTASMDOC
-#define MTASM_IR_MTASMDOC
+#ifndef FTM_IR_FTMDOC
+#define FTM_IR_FTMDOC
 
-include "mtas/Dialect/Mtasm/IR/MtasmBase.td"
-include "mtas/Dialect/Mtasm/IR/MtasmOps.td"
+include "mtas/Dialect/Ftm/IR/FtmBase.td"
+include "mtas/Dialect/Ftm/IR/FtmOps.td"
 
-#endif // MTASM_IR_MTASMDOC
+#endif // FTM_IR_FTMDOC

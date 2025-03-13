@@ -1,4 +1,4 @@
-//===- MtasmEnums.td - Mtasm dialect base support ------*- tablegen -*-===//
+//===- FtmEnums.td - Ftm dialect base support ------*- tablegen -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,20 +6,20 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This is the definition file for enums used in mtasm operations.
+// This is the definition file for enums used in ftm operations.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef MTASM_IR_ENUMS
-#define MTASM_IR_ENUMS
+#ifndef FTM_IR_ENUMS
+#define FTM_IR_ENUMS
 
 include "mlir/IR/EnumAttr.td"
 
-class Mtasm_I32Enum<string name, string description,
+class Ftm_I32Enum<string name, string description,
                       list<I32EnumAttrCase> cases>
     : I32EnumAttr<name, description, cases> {
   let genSpecializedAttr = 0;
-  let cppNamespace = "::mlir::mtasm";
+  let cppNamespace = "::mlir::ftm";
 }
 
 def DimX : I64EnumAttrCase<"DimX", 0, "x">;
@@ -31,16 +31,16 @@ def LinearDim2 : I64EnumAttrCase<"LinearDim2", 5, "linear_dim_2">;
 
 def MappingIdEnum : I64EnumAttr<"MappingId", "Mapping ids for loop mapping", [
     DimX, DimY, DimZ, LinearDim0, LinearDim1, LinearDim2]> {
-  let cppNamespace = "::mlir::mtasm";
+  let cppNamespace = "::mlir::ftm";
 }
 
 def AxisM : I64EnumAttrCase<"M", 0, "dim_M">;
 def AxisN : I64EnumAttrCase<"N", 1, "dim_N">;
 def AxisK : I64EnumAttrCase<"K", 2, "dim_K">;
 
-def Mtasm_AxisEnum : I64EnumAttr<"Axis", "axis", [
+def Ftm_AxisEnum : I64EnumAttr<"Axis", "axis", [
     AxisM, AxisN, AxisK]> {
-  let cppNamespace = "::mlir::mtasm";
+  let cppNamespace = "::mlir::ftm";
 }
 
 def MatA : I64EnumAttrCase<"MatA", 0, "mat_A">;
@@ -48,19 +48,22 @@ def MatB : I64EnumAttrCase<"MatB", 1, "mat_B">;
 def MatC : I64EnumAttrCase<"MatC", 2, "mat_C">;
 def MatE : I64EnumAttrCase<"MatE", 3, "mat_E">;
 
-def Mtasm_MatrixEnum : I64EnumAttr<"Matrix", "matrix", [
+def Ftm_MatrixEnum : I64EnumAttr<"Matrix", "matrix", [
     MatA, MatB, MatC, MatE]> {
-  let cppNamespace = "::mlir::mtasm";
+  let cppNamespace = "::mlir::ftm";
 }
 
 def CacheDDR : I64EnumAttrCase<"DDR", 0, "ddr">;
 def CacheGSM : I64EnumAttrCase<"GSM", 1, "gsm">;
 def CacheAM : I64EnumAttrCase<"AM", 2, "am">;
 def CacheSM : I64EnumAttrCase<"SM", 3, "sm">;
+def ScalarRegister : I64EnumAttrCase<"ScalarRegister", 4, "scalar_register">;
+def VectorRegister : I64EnumAttrCase<"VectorRegister", 5, "vector_register">;
 
-def Mtasm_CacheEnum : I64EnumAttr<"Cache", "cache", [
-    CacheDDR, CacheGSM, CacheAM, CacheSM]> {
-  let cppNamespace = "::mlir::mtasm";
+def Ftm_CacheEnum : I64EnumAttr<"Cache", "cache", [
+    CacheDDR, CacheGSM, CacheAM, CacheSM,
+    ScalarRegister, VectorRegister]> {
+  let cppNamespace = "::mlir::ftm";
 }
 
 // Enums for pipelining.
@@ -70,9 +73,9 @@ def Epilogue : I64EnumAttrCase<"Epilogue", 2, "epilogue">;
 def Prefetch : I64EnumAttrCase<"Prefetch", 3, "prefetch">;
 def PostStore : I64EnumAttrCase<"PostStore", 4, "post_store">;
 
-def Mtasm_StageEnum : I64EnumAttr<"Stage", "stage", [
+def Ftm_StageEnum : I64EnumAttr<"Stage", "stage", [
     Prelogue, MainBody, Epilogue, Prefetch, PostStore]> {
-  let cppNamespace = "::mlir::mtasm";
+  let cppNamespace = "::mlir::ftm";
 }
 
-#endif // MTASM_IR_ENUMS
+#endif // FTM_IR_ENUMS

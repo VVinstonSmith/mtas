@@ -7,24 +7,24 @@
 //===----------------------------------------------------------------------===//
 //
 // This file defines a helper to trigger the registration of all
-// mtasm-specific dialects to the system.
+// ftm-specific dialects to the system.
 //
 //===----------------------------------------------------------------------===//
 
 #ifndef MTAS_INITALLDIALECTS_H
 #define MTAS_INITALLDIALECTS_H
 
-#include "mtas/Dialect/Mtasm/IR/Mtasm.h"
+#include "mtas/Dialect/Ftm/IR/Ftm.h"
 
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/IR/MLIRContext.h"
 
 namespace mtas {
 
-/// Add all the mtasm-specific dialects to the provided registry.
+/// Add all the ftm-specific dialects to the provided registry.
 inline void registerAllDialects(mlir::DialectRegistry &registry) {
   // clang-format off
-  registry.insert<mlir::mtasm::MtasmDialect>();
+  registry.insert<mlir::ftm::FtmDialect>();
   // clang-format on
 }
 

@@ -1,4 +1,4 @@
-//===- mtas-opt.cpp - MtASM Optimizer Driver -----------*- C++ -*-===//
+//===- mtas-opt.cpp - Ftm Optimizer Driver -----------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.

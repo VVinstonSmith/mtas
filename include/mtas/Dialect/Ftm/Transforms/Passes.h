@@ -1,4 +1,4 @@
-//===- Passes.h - Mtasm dialect pass entrypoints --------------*- C++ -*-===//
+//===- Passes.h - Ftm dialect pass entrypoints --------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -9,10 +9,10 @@
 // This header file defines prototypes that expose pass constructors.
 //
 //===----------------------------------------------------------------------===//
-#ifndef MTAS_DIALECT_MTASM_TRANSFORMS_PASSES_H
-#define MTAS_DIALECT_MTASM_TRANSFORMS_PASSES_H
+#ifndef MTAS_DIALECT_FTM_TRANSFORMS_PASSES_H
+#define MTAS_DIALECT_FTM_TRANSFORMS_PASSES_H
 
-#include "mtas/Dialect/Mtasm/IR/Mtasm.h"
+#include "mtas/Dialect/Ftm/IR/Ftm.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 
@@ -22,22 +22,14 @@ namespace func {
 class FuncOp;
 } // namespace func
 
-namespace mtasm {
-namespace opfusion {
-class FusableHelper;
-class FusableBlock;
-using FusableBlocks = SmallVector<FusableBlock, 8>;
-} // namespace opfusion
-
-} // namespace mtasm
 } // namespace mlir
 
 namespace mlir {
 
 #define GEN_PASS_DECL
-#include "mtas/Dialect/Mtasm/Transforms/Passes.h.inc"
+#include "mtas/Dialect/Ftm/Transforms/Passes.h.inc"
 
-namespace mtasm {
+namespace ftm {
 
 /// Create a pass to do multi-buffering
 std::unique_ptr<Pass> createMultiBufferingPass();
@@ -48,15 +40,21 @@ std::unique_ptr<Pass> createTileDynamicDimsPass();
 /// Create a pass to unroll the innermost loop
 std::unique_ptr<Pass> createLoopUnrollingPass();
 
+/// Create a pass to split linalg.matmul
+std::unique_ptr<Pass> createSplitMatmulPass();
+
+/// Create a pass to lower linalg.matmul to fma ops
+std::unique_ptr<Pass> createLowerMatmulToFmaPass();
+
 //===----------------------------------------------------------------------===//
 // Registration
 //===----------------------------------------------------------------------===//
 
 /// Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION
-#include "mtas/Dialect/Mtasm/Transforms/Passes.h.inc"
+#include "mtas/Dialect/Ftm/Transforms/Passes.h.inc"
 
-} // namespace mtasm
+} // namespace ftm
 } // namespace mlir
 
-#endif // MTAS_DIALECT_MTASM_TRANSFORMS_PASSES_H
+#endif // MTAS_DIALECT_FTM_TRANSFORMS_PASSES_H

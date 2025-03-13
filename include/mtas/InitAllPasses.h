@@ -14,7 +14,7 @@
 #ifndef MTAS_INITALLPASSES_H
 #define MTAS_INITALLPASSES_H
 
-#include "mtas/Dialect/Mtasm/Transforms/Passes.h"
+#include "mtas/Dialect/Ftm/Transforms/Passes.h"
 
 namespace mtas {
 
@@ -22,7 +22,7 @@ namespace mtas {
 // the global registry.
 inline void registerAllPasses() {
   // Dialect passes
-  mlir::mtasm::registerMtasmPasses();
+  mlir::ftm::registerFtmPasses();
 }
 
 } // namespace mtas

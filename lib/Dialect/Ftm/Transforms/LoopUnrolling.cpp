@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "mtas/Dialect/Mtasm/IR/Mtasm.h"
-#include "mtas/Dialect/Mtasm/Transforms/Passes.h"
+#include "mtas/Dialect/Ftm/IR/Ftm.h"
+#include "mtas/Dialect/Ftm/Transforms/Passes.h"
 
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -20,15 +20,15 @@ using namespace std;
 
 namespace mlir {
 #define GEN_PASS_DEF_LOOPUNROLLING
-#include "mtas/Dialect/Mtasm/Transforms/Passes.h.inc"
+#include "mtas/Dialect/Ftm/Transforms/Passes.h.inc"
 } // namespace mlir
 
 using namespace mlir;
-using namespace mtasm;
+using namespace ftm;
 
 namespace {
 
-scf::ForOp applyUnrolling(scf::ForOp loopOp, unsigned factor) {
+scf::ForOp applyLoopUnrolling(scf::ForOp loopOp, unsigned factor) {
   auto loc = loopOp.getLoc();
   auto ctx = loopOp.getContext();
   OpBuilder builder(ctx);
@@ -47,9 +47,9 @@ scf::ForOp applyUnrolling(scf::ForOp loopOp, unsigned factor) {
   for(auto [idx, orgRegionArg] : llvm::enumerate(loopOp.getRegionIterArgs())) {
     mapping.map(orgRegionArg, newLoopOp.getRegionIterArg(idx));
   }
-  builder.setInsertionPointToStart(newLoopOp.getBody()); 
-  builder.create<mtasm::AnnotateOp>(loc)->setAttr(
-        mtasm::UnrollSegmentAttr::name,
+  builder.setInsertionPointToStart(newLoopOp.getBody());
+  builder.create<ftm::AnnotateOp>(loc)->setAttr(
+        ftm::UnrollSegmentAttr::name,
         UnrollSegmentAttr::get(newLoopOp->getContext(), 0));
   for(uint64_t nf = 0; nf < factor; nf++) {
     mapping.map(loopOp.getInductionVar(), inductVar);
@@ -65,14 +65,14 @@ scf::ForOp applyUnrolling(scf::ForOp loopOp, unsigned factor) {
           mapping.map(orgRegionArg, newYieldOp->getOperand(idx));
         }
         newYieldOp->erase();
-        builder.create<mtasm::AnnotateOp>(loc)->setAttr(
-            mtasm::UnrollSegmentAttr::name,
+        builder.create<ftm::AnnotateOp>(loc)->setAttr(
+            ftm::UnrollSegmentAttr::name,
             UnrollSegmentAttr::get(newLoopOp->getContext(), nf + 1));
         inductVar = builder.create<arith::AddIOp>(loc, inductVar, loopOp.getStep());
         return WalkResult::interrupt();
       }
       auto newOp = builder.clone(*op, mapping);
-      newOp->setAttr(mtasm::UnrollSegmentAttr::name,
+      newOp->setAttr(ftm::UnrollSegmentAttr::name,
           UnrollSegmentAttr::get(newLoopOp->getContext(), nf));
       return WalkResult::advance();
     });
@@ -82,23 +82,10 @@ scf::ForOp applyUnrolling(scf::ForOp loopOp, unsigned factor) {
   }
   
   newLoopOp->setAttrs(loopOp->getAttrs());
-  newLoopOp->setAttr(mtasm::UnrollFactorAttr::name, 
+  newLoopOp->setAttr(ftm::UnrollFactorAttr::name, 
       UnrollFactorAttr::get(newLoopOp->getContext(), factor));
   loopOp.erase();
   return newLoopOp;
-}
-
-void unrollInnermostLoop(scf::ForOp loopOp, unsigned unrollingFactor) {
-  bool thisIsInnermost = true;
-  loopOp.walk([&](scf::ForOp op) {
-    if(op->getParentOp() != loopOp)
-      return WalkResult::skip();
-    thisIsInnermost = false;
-    unrollInnermostLoop(op, unrollingFactor);
-    return WalkResult::advance();
-  });
-  if(thisIsInnermost)
-    auto unrolledLoop = applyUnrolling(loopOp, unrollingFactor);
 }
 
 } // namepsace
@@ -108,22 +95,19 @@ class LoopUnrollingPass : public impl::LoopUnrollingBase<LoopUnrollingPass> {
 public:
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
-
-    unsigned unrollingFactor = 2;
-    unrollingFactor = this->unrollingFactor;
-
     funcOp.walk([&](scf::ForOp loopOp) {
       if(loopOp->getParentOp() != funcOp)
         return WalkResult::skip();
-
-      unrollInnermostLoop(loopOp, unrollingFactor);
-
+      if(auto attr = loopOp->getAttr(ftm::UnrollFactorAttr::name)) {
+        unsigned unrollingFactor = attr.cast<ftm::UnrollFactorAttr>().getFactor();
+        applyLoopUnrolling(loopOp, unrollingFactor);
+      }
       return WalkResult::advance();
     });
   }
 };
 } // namespace mlir
 
-std::unique_ptr<Pass> mlir::mtasm::createLoopUnrollingPass() {
+std::unique_ptr<Pass> mlir::ftm::createLoopUnrollingPass() {
   return std::make_unique<LoopUnrollingPass>();
 }

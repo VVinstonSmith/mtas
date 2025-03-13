@@ -1,4 +1,4 @@
-//===-- Passes.td - Mtasm dialect pass definition file ------*-tablegen-*-==//
+//===-- Passes.td - Ftm dialect pass definition file ------*-tablegen-*-==//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,39 +6,39 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef MTAS_DIALECT_MTASM_TRANSFORMS_PASSES
-#define MTAS_DIALECT_MTASM_TRANSFORMS_PASSES
+#ifndef MTAS_DIALECT_FTM_TRANSFORMS_PASSES
+#define MTAS_DIALECT_FTM_TRANSFORMS_PASSES
 
 include "mlir/Pass/PassBase.td"
 
-// def MtasmOpFusion : Pass<"mtasm-fuse-ops", "ModuleOp"> {
-//   let summary = "Mtasm Fuse operations on tensors";
-//   let constructor = "mtasm::createMtasmOpFusionPass()";
+// def FtmOpFusion : Pass<"ftm-fuse-ops", "ModuleOp"> {
+//   let summary = "Ftm Fuse operations on tensors";
+//   let constructor = "ftm::createFtmOpFusionPass()";
 //   let dependentDialects = [
-//     "mtasm::MtasmDialect",
+//     "ftm::FtmDialect",
 //   ];
 //   let options = [
-//     Option<"outputMode", "output-mode", "::mlir::mtasm::OutputMode",
-//       "mtasm::OutputMode::Multiple",
+//     Option<"outputMode", "output-mode", "::mlir::ftm::OutputMode",
+//       "ftm::OutputMode::Multiple",
 //       "Outlined function output mode (default is multi, can also use single or single-aggr)",
 //       [{::llvm::cl::values(
-//           clEnumValN(mtasm::OutputMode::Multiple, "multi",
+//           clEnumValN(ftm::OutputMode::Multiple, "multi",
 //                     "Outlined function with multiple outputs"),
-//           clEnumValN(mtasm::OutputMode::Single, "single",
+//           clEnumValN(ftm::OutputMode::Single, "single",
 //                     "Outlined function with single output"),
-//           clEnumValN(mtasm::OutputMode::SingleAggressive, "single-aggr",
+//           clEnumValN(ftm::OutputMode::SingleAggressive, "single-aggr",
 //                     "Outlined function with single output, fusing "
 //                     "more aggressively by duplicating operations")
 //       )}]>,
-//     Option<"fusionMode", "fusion-mode", "::mlir::mtasm::FusionKind",
-//       "mtasm::FusionKind::Unknown", "Fusion kind is determined by label",
+//     Option<"fusionMode", "fusion-mode", "::mlir::ftm::FusionKind",
+//       "ftm::FusionKind::Unknown", "Fusion kind is determined by label",
 //       [{::llvm::cl::values(
-//           clEnumValN(mtasm::FusionKind::PureElemwise, "PURE_ELEMWISE", ""),
-//           clEnumValN(mtasm::FusionKind::AnyPB, "ANY_PB", ""),
-//           clEnumValN(mtasm::FusionKind::LastAxisPBR, "LAST_AXIS_PBR", ""),
-//           clEnumValN(mtasm::FusionKind::MixCV, "MIX_CV", ""),
-//           clEnumValN(mtasm::FusionKind::ShallowCV, "SHALLOW_CV", ""),
-//           clEnumValN(mtasm::FusionKind::Unknown, "UNKNOWN", "")
+//           clEnumValN(ftm::FusionKind::PureElemwise, "PURE_ELEMWISE", ""),
+//           clEnumValN(ftm::FusionKind::AnyPB, "ANY_PB", ""),
+//           clEnumValN(ftm::FusionKind::LastAxisPBR, "LAST_AXIS_PBR", ""),
+//           clEnumValN(ftm::FusionKind::MixCV, "MIX_CV", ""),
+//           clEnumValN(ftm::FusionKind::ShallowCV, "SHALLOW_CV", ""),
+//           clEnumValN(ftm::FusionKind::Unknown, "UNKNOWN", "")
 //       )}]>,
 //     Option<"alwaysInline", "always-inline", "bool", /*default=*/"false",
 //                "Enable always inline for the outline function.">,
@@ -50,11 +50,11 @@ include "mlir/Pass/PassBase.td"
 //   ];
 // }
 
-// def AutoSchedule : Pass<"mtasm-auto-schedule", "ModuleOp"> {
+// def AutoSchedule : Pass<"ftm-auto-schedule", "ModuleOp"> {
 //   let summary = "Auto schedule fused kernels.";
-//   let constructor = "mlir::mtasm::createMtasmAutoSchedulePass()";
+//   let constructor = "mlir::ftm::createFtmAutoSchedulePass()";
 //   let dependentDialects = ["linalg::LinalgDialect",
-//                            "mtasm::MtasmDialect",
+//                            "ftm::FtmDialect",
 //                            "transform::TransformDialect",
 //                            "arith::ArithDialect"];
 //   let options = [
@@ -66,12 +66,12 @@ include "mlir/Pass/PassBase.td"
 //   ];
 // }
 
-def MultiBuffering : Pass<"mtasm-multi-buffering", "func::FuncOp"> {
+def MultiBuffering : Pass<"ftm-multi-buffering", "func::FuncOp"> {
   let summary = "multiple buffering memref.copy";
-  let constructor = "mlir::mtasm::createMultiBufferingPass()";
+  let constructor = "mlir::ftm::createMultiBufferingPass()";
   let dependentDialects = [
     "linalg::LinalgDialect",
-    "mtasm::MtasmDialect",
+    "ftm::FtmDialect",
     "scf::SCFDialect",
     "memref::MemRefDialect",
   ];
@@ -83,28 +83,49 @@ def MultiBuffering : Pass<"mtasm-multi-buffering", "func::FuncOp"> {
 
 def TileDynamicDims : Pass<"tile-dynamic-dims", "func::FuncOp"> {
   let summary = "A pass to tile dynamic dimensions";
-  let constructor = "mlir::mtasm::createTileDynamicDimsPass()";
+  let constructor = "mlir::ftm::createTileDynamicDimsPass()";
   let dependentDialects = [
     "linalg::LinalgDialect",
     "scf::SCFDialect",
     "memref::MemRefDialect",
-    "mtasm::MtasmDialect",
+    "ftm::FtmDialect",
   ];
 }
 
 def LoopUnrolling : Pass<"loop-unrolling", "func::FuncOp"> {
   let summary = "A pass to unroll the innermost loop";
-  let constructor = "mlir::mtasm::createLoopUnrollingPass()";
+  let constructor = "mlir::ftm::createLoopUnrollingPass()";
   let dependentDialects = [
     "linalg::LinalgDialect",
     "scf::SCFDialect",
     "memref::MemRefDialect",
-    "mtasm::MtasmDialect",
+    "ftm::FtmDialect",
   ];
   let options = [
     Option<"unrollingFactor", "unrolling-factor", "unsigned", "2", "loop unrolling factor">,
   ];
 }
 
+def SplitMatmul : Pass<"split-matmul", "func::FuncOp"> {
+  let summary = "A pass to split linalg.matmul";
+  let constructor = "mlir::ftm::createSplitMatmulPass()";
+  let dependentDialects = [
+    "linalg::LinalgDialect",
+    "scf::SCFDialect",
+    "memref::MemRefDialect",
+    "ftm::FtmDialect",
+  ];
+}
 
-#endif // MTAS_DIALECT_MTASM_TRANSFORMS_PASSES
+def LowerMatmulToFma : Pass<"lower-matmul-to-fma", "func::FuncOp"> {
+  let summary = "A pass to lower linalg.matmul to fma";
+  let constructor = "mlir::ftm::createLowerMatmulToFmaPass()";
+  let dependentDialects = [
+    "linalg::LinalgDialect",
+    "scf::SCFDialect",
+    "memref::MemRefDialect",
+    "ftm::FtmDialect",
+  ];
+}
+
+#endif // MTAS_DIALECT_FTM_TRANSFORMS_PASSES

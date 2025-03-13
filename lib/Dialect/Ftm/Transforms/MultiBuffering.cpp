@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "mtas/Dialect/Mtasm/IR/Mtasm.h"
-#include "mtas/Dialect/Mtasm/Transforms/Passes.h"
+#include "mtas/Dialect/Ftm/IR/Ftm.h"
+#include "mtas/Dialect/Ftm/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -19,19 +19,19 @@ using namespace std;
 
 namespace mlir {
 #define GEN_PASS_DEF_MULTIBUFFERING
-#include "mtas/Dialect/Mtasm/Transforms/Passes.h.inc"
+#include "mtas/Dialect/Ftm/Transforms/Passes.h.inc"
 } // namespace mlir
 
 using namespace mlir;
-using namespace mtasm;
+using namespace ftm;
 
 namespace {
 
 static memref::AllocOp traceAllocOp(Value operand) {
   if(auto parentOp = operand.getDefiningOp()) {
     if(auto allocOp = dyn_cast<memref::AllocOp>(parentOp)) {
-      if(auto dstAttr = allocOp->getAttr(mtasm::MemLevelAttr::name)) {
-        if(cast<mtasm::MemLevelAttr>(dstAttr).getLevel() != Cache::DDR)
+      if(auto dstAttr = allocOp->getAttr(ftm::MemLevelAttr::name)) {
+        if(cast<ftm::MemLevelAttr>(dstAttr).getLevel() != Cache::DDR)
           return allocOp;
       }
     } else if(auto subviewOp = dyn_cast<memref::SubViewOp>(parentOp)) {
@@ -163,9 +163,9 @@ static Value createRemSIOp(Location loc,
   return builder.create<arith::SubIOp>(loc, target, tmp2);
 }
 
-static bool isOperationInStage(Operation* op, mtasm::Stage stage) {
-  if(auto attr = op->getAttr(mtasm::MultiStageAttr::name)) {
-    if(attr.cast<mtasm::MultiStageAttr>().getStage() == stage)
+static bool isOperationInStage(Operation* op, ftm::Stage stage) {
+  if(auto attr = op->getAttr(ftm::MultiStageAttr::name)) {
+    if(attr.cast<ftm::MultiStageAttr>().getStage() == stage)
       return true;
   } return false;
 }
@@ -192,10 +192,10 @@ scf::ForOp multiBufferize(scf::ForOp loopOp, int level) {
       auto srcAlloc = traceAllocOp(copySrc);
       auto dstAlloc = traceAllocOp(copyDst);
       if(srcAlloc && dstAlloc) {
-        auto srcMemLevel = cast<mtasm::MemLevelAttr>(
-            srcAlloc->getAttr(mtasm::MemLevelAttr::name)).getLevel();
-        auto dstMemLevel = cast<mtasm::MemLevelAttr>(
-            dstAlloc->getAttr(mtasm::MemLevelAttr::name)).getLevel();
+        auto srcMemLevel = cast<ftm::MemLevelAttr>(
+            srcAlloc->getAttr(ftm::MemLevelAttr::name)).getLevel();
+        auto dstMemLevel = cast<ftm::MemLevelAttr>(
+            dstAlloc->getAttr(ftm::MemLevelAttr::name)).getLevel();
         if(srcMemLevel < dstMemLevel) { // gsm -> am,sm
           srcAlloc = nullptr;
         } else { // am,sm -> gsm
@@ -244,8 +244,8 @@ scf::ForOp multiBufferize(scf::ForOp loopOp, int level) {
     prelogueMapping.map(loopOp.getInductionVar(), loopOp.getLowerBound());
     
     builder.setInsertionPoint(loopOp);
-    builder.create<mtasm::AnnotateOp>(loc)->setAttr(
-        mtasm::MultiStageAttr::name,
+    builder.create<ftm::AnnotateOp>(loc)->setAttr(
+        ftm::MultiStageAttr::name,
         MultiStageAttr::get(ctx, Stage::Prelogue));
     
     loopOp.walk([&](Operation *op) {
@@ -258,8 +258,8 @@ scf::ForOp multiBufferize(scf::ForOp loopOp, int level) {
         return WalkResult::interrupt();
       
       Operation *newOp = builder.clone(*op, prelogueMapping);
-      newOp->setAttr(mtasm::MultiStageAttr::name, 
-          mtasm::MultiStageAttr::get(ctx, mtasm::Stage::Prelogue));
+      newOp->setAttr(ftm::MultiStageAttr::name, 
+          ftm::MultiStageAttr::get(ctx, ftm::Stage::Prelogue));
       return WalkResult::advance();
     });
   }
@@ -291,7 +291,7 @@ scf::ForOp multiBufferize(scf::ForOp loopOp, int level) {
         return WalkResult::interrupt();
 
       Operation *newOp = builder.clone(*op, prefetchMapping);
-      newOp->setAttr(mtasm::MultiStageAttr::name,
+      newOp->setAttr(ftm::MultiStageAttr::name,
           MultiStageAttr::get(ctx, Stage::Prefetch));
       return WalkResult::advance();
     });
@@ -317,7 +317,7 @@ scf::ForOp multiBufferize(scf::ForOp loopOp, int level) {
           if(!activate)
             return WalkResult::skip();
           Operation *newOp = builder.clone(*op, bodyMapping);
-          newOp->setAttr(mtasm::MultiStageAttr::name,
+          newOp->setAttr(ftm::MultiStageAttr::name,
               MultiStageAttr::get(ctx, Stage::PostStore));
           return WalkResult::skip();
         }
@@ -361,6 +361,6 @@ public:
 };
 } // namespace mlir
 
-std::unique_ptr<Pass> mlir::mtasm::createMultiBufferingPass() {
+std::unique_ptr<Pass> mlir::ftm::createMultiBufferingPass() {
   return std::make_unique<MultiBufferingPass>();
 }

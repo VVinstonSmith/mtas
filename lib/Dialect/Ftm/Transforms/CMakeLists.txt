@@ -1,13 +1,15 @@
-add_mlir_dialect_library(MLIRMtasmTransforms
+add_mlir_dialect_library(MLIRFtmTransforms
     MultiBuffering.cpp
     TileDynamicDims.cpp
     LoopUnrolling.cpp
+    SplitMatmul.cpp
+    LowerMatmulToFma.cpp
 
     ADDITIONAL_HEADER_DIRS
-    ${MTAS_SOURCE_DIR}/include/mtas/Dialect/Mtasm
+    ${MTAS_SOURCE_DIR}/include/mtas/Dialect/Ftm
 
     DEPENDS
-    MLIRMtasmPassIncGen
+    MLIRFtmPassIncGen
 
     LINK_LIBS PUBLIC
     MLIRTransformDialectTransforms
