@@ -43,13 +43,15 @@ def Ftm_AxisEnum : I64EnumAttr<"Axis", "axis", [
   let cppNamespace = "::mlir::ftm";
 }
 
-def MatA : I64EnumAttrCase<"MatA", 0, "mat_A">;
-def MatB : I64EnumAttrCase<"MatB", 1, "mat_B">;
-def MatC : I64EnumAttrCase<"MatC", 2, "mat_C">;
-def MatE : I64EnumAttrCase<"MatE", 3, "mat_E">;
+def MatX : I64EnumAttrCase<"MatX", 0, "mat_X">;
+def MatA : I64EnumAttrCase<"MatA", 1, "mat_A">;
+def MatB : I64EnumAttrCase<"MatB", 2, "mat_B">;
+def MatC : I64EnumAttrCase<"MatC", 3, "mat_C">;
+def MatD : I64EnumAttrCase<"MatD", 4, "mat_D">;
+def MatE : I64EnumAttrCase<"MatE", 5, "mat_E">;
 
 def Ftm_MatrixEnum : I64EnumAttr<"Matrix", "matrix", [
-    MatA, MatB, MatC, MatE]> {
+    MatX, MatA, MatB, MatC, MatD, MatE]> {
   let cppNamespace = "::mlir::ftm";
 }
 
@@ -59,10 +61,11 @@ def CacheAM : I64EnumAttrCase<"AM", 2, "am">;
 def CacheSM : I64EnumAttrCase<"SM", 3, "sm">;
 def ScalarRegister : I64EnumAttrCase<"ScalarRegister", 4, "scalar_register">;
 def VectorRegister : I64EnumAttrCase<"VectorRegister", 5, "vector_register">;
+def AddressRegister : I64EnumAttrCase<"AddressRegister", 6, "address_register">;
 
 def Ftm_CacheEnum : I64EnumAttr<"Cache", "cache", [
     CacheDDR, CacheGSM, CacheAM, CacheSM,
-    ScalarRegister, VectorRegister]> {
+    ScalarRegister, VectorRegister, AddressRegister ]> {
   let cppNamespace = "::mlir::ftm";
 }
 

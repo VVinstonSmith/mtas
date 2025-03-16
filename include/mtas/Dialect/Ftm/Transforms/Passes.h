@@ -40,11 +40,26 @@ std::unique_ptr<Pass> createTileDynamicDimsPass();
 /// Create a pass to unroll the innermost loop
 std::unique_ptr<Pass> createLoopUnrollingPass();
 
+/// Create a pass to fold loops with static parameters
+std::unique_ptr<Pass> createLoopFoldingPass();
+
 /// Create a pass to split linalg.matmul
 std::unique_ptr<Pass> createSplitMatmulPass();
 
 /// Create a pass to lower linalg.matmul to fma ops
 std::unique_ptr<Pass> createLowerMatmulToFmaPass();
+
+/// Create a pass to lower kernel arguments
+std::unique_ptr<Pass> createLowerKernelArgumentsPass();
+
+/// Create a pass to lower lower load and store memref to ptr
+std::unique_ptr<Pass> createLowerLoadAndStoreMemRefToPtrPass();
+
+/// Create a pass to cast ptr to int64
+std::unique_ptr<Pass> createCastPtrToInt64Pass();
+
+/// Create a pass to fold register alloca
+std::unique_ptr<Pass> createFoldRegisterAllocaPass();
 
 //===----------------------------------------------------------------------===//
 // Registration

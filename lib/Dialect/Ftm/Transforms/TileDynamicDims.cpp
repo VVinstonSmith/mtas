@@ -118,9 +118,10 @@ bool implDynamicDimsTiling(Operation* op) {
       if(OperandMemLevels[oprIdx] == Cache::SM)
         tileSizes[linalgDimIdx] = 1;
       // find out dynamic dimensions
-      if(!memrefType.isDynamicDim(dimIdx))
+      if(!memrefType.isDynamicDim(dimIdx) &&
+          memrefType.getDimSize(dimIdx) / tileSizes[linalgDimIdx] < 16)
         continue;
-      dynamicTileSizes[linalgDimIdx] = 1;
+      dynamicTileSizes[linalgDimIdx] = 1; // dynamic or very long
     }
   }
   
@@ -133,10 +134,28 @@ bool implDynamicDimsTiling(Operation* op) {
   auto [outerTiledOp, outerLoops] = applyTiling(op, dynamicTileSizes, {});
   auto [innerTiledOp, innerLoops] = applyTiling(outerTiledOp.back(), staticTileSizes, {});
 
+  unsigned loopId = 0;
   for(auto loop : outerLoops) {
-    loop->setAttr(ftm::UnrollFactorAttr::name, 
-        ftm::UnrollFactorAttr::get(ctx, 2));
+    loop->setAttr(ftm::LoopIdAttr::name, ftm::LoopIdAttr::get(ctx, loopId++));
   }
+  for(auto loop : innerLoops) {
+    loop->setAttr(ftm::LoopIdAttr::name, ftm::LoopIdAttr::get(ctx, loopId++));
+  }
+
+  if(auto attr = linalgOp->getAttr(ftm::UnrollLoopNumberAttr::name)) {
+    int64_t unrollLoopNumber = attr.cast<ftm::UnrollLoopNumberAttr>().getNumber();
+    if(unrollLoopNumber < innerLoops.size()) {
+      innerLoops[unrollLoopNumber]->setAttr(ftm::UnrollFactorAttr::name, 
+          ftm::UnrollFactorAttr::get(ctx, 2));
+    } else if(unrollLoopNumber < innerLoops.size() + outerLoops.size()) {
+      outerLoops[unrollLoopNumber - innerLoops.size()]->setAttr(
+        ftm::UnrollFactorAttr::name, ftm::UnrollFactorAttr::get(ctx, 2));
+    } else {
+      llvm::errs() << "unroll loop number is wrong\n";
+      return false;
+    }
+  }
+
 }
 
 } // namepsace

@@ -106,6 +106,17 @@ def LoopUnrolling : Pass<"loop-unrolling", "func::FuncOp"> {
   ];
 }
 
+def LoopFolding : Pass<"loop-folding", "func::FuncOp"> {
+  let summary = "A pass to fold loops with static parameters";
+  let constructor = "mlir::ftm::createLoopFoldingPass()";
+  let dependentDialects = [
+    "linalg::LinalgDialect",
+    "scf::SCFDialect",
+    "memref::MemRefDialect",
+    "ftm::FtmDialect",
+  ];
+}
+
 def SplitMatmul : Pass<"split-matmul", "func::FuncOp"> {
   let summary = "A pass to split linalg.matmul";
   let constructor = "mlir::ftm::createSplitMatmulPass()";
@@ -127,5 +138,48 @@ def LowerMatmulToFma : Pass<"lower-matmul-to-fma", "func::FuncOp"> {
     "ftm::FtmDialect",
   ];
 }
+
+def LowerKernelArguments : Pass<"lower-kernel-arguments", "func::FuncOp"> {
+  let summary = "A pass to lower kernel arguments";
+  let constructor = "mlir::ftm::createLowerKernelArgumentsPass()";
+  let dependentDialects = [
+    "linalg::LinalgDialect",
+    "memref::MemRefDialect",
+    "LLVM::LLVMDialect",
+    "ftm::FtmDialect",
+  ];
+}
+
+def LowerLoadAndStoreMemRefToPtr : Pass<"lower-load-and-store-memref-to-ptr", "func::FuncOp"> {
+  let summary = "A pass to lower load and store memref to ptr";
+  let constructor = "mlir::ftm::createLowerLoadAndStoreMemRefToPtrPass()";
+  let dependentDialects = [
+    "linalg::LinalgDialect",
+    "memref::MemRefDialect",
+    "mlir::vector::VectorDialect",
+    "LLVM::LLVMDialect",
+    "ftm::FtmDialect",
+  ];
+}
+
+def CastPtrToInt64 : Pass<"cast-ptr-to-int64", "func::FuncOp"> {
+  let summary = "A pass to cast ptr to int64";
+  let constructor = "mlir::ftm::createCastPtrToInt64Pass()";
+  let dependentDialects = [
+    "LLVM::LLVMDialect",
+    "ftm::FtmDialect",
+  ];
+}
+
+def FoldRegisterAlloca : Pass<"fold-register-alloca", "func::FuncOp"> {
+  let summary = "A pass to fold memref.alloca with register attr";
+  let constructor = "mlir::ftm::createFoldRegisterAllocaPass()";
+  let dependentDialects = [
+    "memref::MemRefDialect",
+    "mlir::vector::VectorDialect",
+    "ftm::FtmDialect",
+  ];
+}
+
 
 #endif // MTAS_DIALECT_FTM_TRANSFORMS_PASSES

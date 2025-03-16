@@ -14,6 +14,7 @@
 #ifndef MTAS_INITALLPASSES_H
 #define MTAS_INITALLPASSES_H
 
+#include "mtas/Conversion/Passes.h"
 #include "mtas/Dialect/Ftm/Transforms/Passes.h"
 
 namespace mtas {
@@ -21,6 +22,8 @@ namespace mtas {
 // This function may be called to register the hivm-specific MLIR passes with
 // the global registry.
 inline void registerAllPasses() {
+  // Conversion passes
+  mtas::registerConversionPasses();
   // Dialect passes
   mlir::ftm::registerFtmPasses();
 }

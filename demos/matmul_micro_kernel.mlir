@@ -18,14 +18,31 @@
 // }
 
 
+// module {
+//   func.func @matmul_only(
+//     %A: memref<6x?xf32>,
+//     %B: memref<?x?xf32>,
+//     %C: memref<6x?xf32>,
+//     %D: memref<?x?xf32>,
+//     %E: memref<6x?xf32>)
+//   {
+    
+//     linalg.matmul ins(%A, %B : memref<6x?xf32>, memref<?x?xf32>) outs(%C : memref<?x?xf32>)
+//     linalg.matmul ins(%C, %D : memref<6x?xf32>, memref<?x96xf32>) outs(%E : memref<6x96xf32>)
+//     return
+//   }
+// }
+
+
 
 module {
   func.func @matmul_only(
-    %A: memref<6x?xf32> {ftm.memory_level = #ftm.memory_level<sm>}, 
-    %B: memref<?x96xf32> {ftm.memory_level = #ftm.memory_level<am>}, 
-    %C: memref<6x96xf32> {ftm.memory_level = #ftm.memory_level<am>})
+    %A: memref<3x512xf32> {ftm.matrix_name = #ftm.matrix_name<mat_A>, ftm.memory_level = #ftm.memory_level<sm>}, 
+    %B: memref<512x64xf32> {ftm.matrix_name = #ftm.matrix_name<mat_B>, ftm.memory_level = #ftm.memory_level<am>}, 
+    %C: memref<3x64xf32> {ftm.matrix_name = #ftm.matrix_name<mat_C>, ftm.memory_level = #ftm.memory_level<am>})
   {
-    linalg.matmul ins(%A, %B : memref<6x?xf32>, memref<?x96xf32>) outs(%C : memref<6x96xf32>)
+    linalg.matmul {ftm.unroll_loop_number = #ftm.unroll_loop_number<2>}
+      ins(%A, %B : memref<3x512xf32>, memref<512x64xf32>) outs(%C : memref<3x64xf32>)
     return
   }
 }

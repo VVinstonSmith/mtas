@@ -48,9 +48,9 @@ scf::ForOp applyLoopUnrolling(scf::ForOp loopOp, unsigned factor) {
     mapping.map(orgRegionArg, newLoopOp.getRegionIterArg(idx));
   }
   builder.setInsertionPointToStart(newLoopOp.getBody());
-  builder.create<ftm::AnnotateOp>(loc)->setAttr(
-        ftm::UnrollSegmentAttr::name,
-        UnrollSegmentAttr::get(newLoopOp->getContext(), 0));
+  // builder.create<ftm::AnnotateOp>(loc)->setAttr(
+  //       ftm::UnrollSegmentAttr::name,
+  //       UnrollSegmentAttr::get(newLoopOp->getContext(), 0));
   for(uint64_t nf = 0; nf < factor; nf++) {
     mapping.map(loopOp.getInductionVar(), inductVar);
     loopOp.walk([&](Operation* op){
@@ -65,9 +65,9 @@ scf::ForOp applyLoopUnrolling(scf::ForOp loopOp, unsigned factor) {
           mapping.map(orgRegionArg, newYieldOp->getOperand(idx));
         }
         newYieldOp->erase();
-        builder.create<ftm::AnnotateOp>(loc)->setAttr(
-            ftm::UnrollSegmentAttr::name,
-            UnrollSegmentAttr::get(newLoopOp->getContext(), nf + 1));
+        // builder.create<ftm::AnnotateOp>(loc)->setAttr(
+        //     ftm::UnrollSegmentAttr::name,
+        //     UnrollSegmentAttr::get(newLoopOp->getContext(), nf + 1));
         inductVar = builder.create<arith::AddIOp>(loc, inductVar, loopOp.getStep());
         return WalkResult::interrupt();
       }

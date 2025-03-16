@@ -43,13 +43,13 @@ def Ftm_MemLevelAttr : Ftm_Attr<"MemLevel", "memory_level"> {
   }];
 }
 
-def Ftm_FuncArgMatAttr : Ftm_Attr<"FuncArgMat", "func_arg_mat"> {
+def Ftm_MatrixNameAttr : Ftm_Attr<"MatrixName", "matrix_name"> {
   let parameters = (ins
     EnumParameter<Ftm_MatrixEnum>:$matrix
   );
   let assemblyFormat = "`<` params `>`";
   let description = [{
-    Which matrix in matmul.
+    matrix name.s
   }];
 }
 
@@ -93,13 +93,54 @@ def Ftm_UnrollSegmentAttr : Ftm_Attr<"UnrollSegment", "unroll_segment"> {
   }];
 }
 
-def Ftm_OperandMemLevelAttr : Ftm_Attr<"OperandMemLevel", "matmul_memory_level"> {
+def Ftm_UnrollLoopNumber : Ftm_Attr<"UnrollLoopNumber", "unroll_loop_number"> {
+  let parameters = (ins
+    OptionalParameter<"unsigned">:$number
+  );
+  let assemblyFormat = "`<` params `>`";
+  let description = [{
+    How many loop layers to unroll?
+  }];
+}
+
+
+def Ftm_OperandMatrixNameAttr : Ftm_Attr<"OperandMatrixName", "operand_matrix_name"> {
+  let parameters = (ins 
+    OptionalArrayRefParameter<"mlir::ftm::Matrix">:$matrixNames
+  );
+  let assemblyFormat = "`<` params `>`";
+  let description = [{
+    matrix name of each operand in a operation.
+  }];
+}
+
+def Ftm_OperandMemLevelAttr : Ftm_Attr<"OperandMemLevel", "operand_memory_level"> {
   let parameters = (ins 
     OptionalArrayRefParameter<"mlir::ftm::Cache">:$memLevels
   );
   let assemblyFormat = "`<` params `>`";
   let description = [{
     memory levels of each operand in a operation.
+  }];
+}
+
+def Ftm_LoopIdAttr : Ftm_Attr<"LoopId", "loop_id"> {
+  let parameters = (ins 
+    OptionalParameter<"unsigned">:$loopId
+  );
+  let assemblyFormat = "`<` params `>`";
+  let description = [{
+    loop id number
+  }];
+}
+
+def Ftm_RegisterIdAttr : Ftm_Attr<"RegisterId", "register_id"> {
+  let parameters = (ins 
+    OptionalParameter<"unsigned">:$id
+  );
+  let assemblyFormat = "`<` params `>`";
+  let description = [{
+    register id
   }];
 }
 

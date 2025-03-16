@@ -28,38 +28,45 @@ using namespace mlir::ftm;
 
 namespace {
 
-mlir::ftm::Cache getOperandMemLevel(Value operand) {
-  ftm::MemLevelAttr memLevelAttr;
+std::pair<ftm::Matrix, ftm::Cache>
+getOperandNameAndMemLevel(Value operand) {
+  ftm::Matrix matrixName = ftm::Matrix::MatX;
+  ftm::Cache memoryLevel = ftm::Cache::SM;
   if(auto defOp = operand.getDefiningOp()) {
-    if(auto attr = defOp->getAttr(ftm::MemLevelAttr::name)) {
-      memLevelAttr = attr.cast<ftm::MemLevelAttr>();
-    }
+    if(auto attr = defOp->getAttr(ftm::MatrixNameAttr::name))
+      matrixName = attr.cast<ftm::MatrixNameAttr>().getMatrix();
+    if(auto attr = defOp->getAttr(ftm::MemLevelAttr::name))
+      memoryLevel = attr.cast<ftm::MemLevelAttr>().getLevel();
   } else if(auto blockArg = dyn_cast<BlockArgument>(operand)) {
     if(auto funcOp = dyn_cast<func::FuncOp>(blockArg.getOwner()->getParentOp())) {
       for(auto funcArg : llvm::enumerate(funcOp.getArguments())) {
         if(funcArg.value() == blockArg) {
-          if(auto attr = funcOp.getArgAttr(funcArg.index(), ftm::MemLevelAttr::name)) {
-            memLevelAttr = attr.cast<ftm::MemLevelAttr>();
-          }
+          if(auto attr = funcOp.getArgAttr(funcArg.index(), ftm::MatrixNameAttr::name))
+            matrixName = attr.cast<ftm::MatrixNameAttr>().getMatrix();
+          if(auto attr = funcOp.getArgAttr(funcArg.index(), ftm::MemLevelAttr::name))
+            memoryLevel = attr.cast<ftm::MemLevelAttr>().getLevel(); 
           break;
         }
       }
     }
   }
-  if(!memLevelAttr)
-    return ftm::Cache::SM;
-  return memLevelAttr.getLevel();
+  return {matrixName, memoryLevel};
 }
 
-void implMatmulSpliting(linalg::MatmulOp matmulOp) {
+bool implMatmulSpliting(linalg::MatmulOp matmulOp) {
   auto loc = matmulOp.getLoc();
   auto ctx = matmulOp.getContext();
   OpBuilder builder(ctx);
 
+  SmallVector<mlir::ftm::Matrix, 3> operandMatNames;
   SmallVector<mlir::ftm::Cache, 3> operandMemLevels;
   for(auto operand : matmulOp.getOperands()) {
-    operandMemLevels.push_back(getOperandMemLevel(operand));
+    auto [operandMatName, operandMemLevel] = getOperandNameAndMemLevel(operand);
+    operandMatNames.push_back(operandMatName);
+    operandMemLevels.push_back(operandMemLevel);
   }
+  matmulOp->setAttr(ftm::OperandMatrixNameAttr::name,
+      ftm::OperandMatrixNameAttr::get(ctx, operandMatNames));
   matmulOp->setAttr(ftm::OperandMemLevelAttr::name,
       ftm::OperandMemLevelAttr::get(ctx, operandMemLevels));
 
@@ -72,6 +79,8 @@ void implMatmulSpliting(linalg::MatmulOp matmulOp) {
   } else if(operandMemLevels[2] == ftm::Cache::SM) {
     operandMemLevels[2] = ftm::Cache::ScalarRegister;
   }
+  tmpMemC->setAttr(ftm::OperandMatrixNameAttr::name,
+      ftm::OperandMatrixNameAttr::get(ctx, operandMatNames[2]));
   tmpMemC->setAttr(ftm::MemLevelAttr::name,
       ftm::MemLevelAttr::get(ctx, operandMemLevels[2]));
   matmulOp.setDpsInitOperand(0, tmpMemC);
@@ -83,7 +92,7 @@ void implMatmulSpliting(linalg::MatmulOp matmulOp) {
   
   builder.setInsertionPointAfter(matmulOp);
   auto addtionOp = builder.create<linalg::AddOp>(loc, ValueRange{matC, tmpMemC}, matC);
-
+  
 }
 
 } // namepsace
