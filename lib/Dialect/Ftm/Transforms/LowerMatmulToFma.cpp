@@ -130,37 +130,23 @@ bool implMatmulLoweringToFma(linalg::MatmulOp matmulOp) {
   for(auto [idx, operand] : llvm::enumerate(matmulOp.getOperands())) {
     auto memLevel = OperandMemLevels[idx];
     if(memLevel == ftm::Cache::AM || memLevel == ftm::Cache::VectorRegister) {
-      fmaOperands[idx] = builder.create<ftm::MemRefLoadOp>(loc,
-          elem1024BitTy, subviews[idx]);
-      
+      auto loadOp = builder.create<ftm::MemRefLoadOp>(loc, elem1024BitTy, subviews[idx]);
+      loadOp->setAttr(ftm::MemLevelAttr::name, MemLevelAttr::get(ctx, OperandMemLevels[idx]));
+      fmaOperands[idx] = loadOp.getResult();
     } else {
       if(unrollSegmentId % 2 == 1) {
-        // auto oddMixedOffsets = subviews[idx].getMixedOffsets();
-        // assert(oddMixedOffsets[1].dyn_cast<Value>());
-        // auto evenColOffset = builder.create<arith::SubIOp>(loc,
-        //     cast<Value>(oddMixedOffsets[1]),
-        //     builder.create<arith::ConstantIndexOp>(loc, 1));
-        // SmallVector<OpFoldResult, 2> evenMixedOffsets{oddMixedOffsets[0], 
-        //                                               evenColOffset.getResult()};
-        // auto evenSubview = builder.create<memref::SubViewOp>(loc,
-        //     subviews[idx].getSource(), evenMixedOffsets,
-        //     subviews[idx].getMixedSizes(), subviews[idx].getMixedStrides());
-        
-        auto evenSubview = 
-            getOffsetSubviewFrom(subviews[idx], /*idx*/1, /*offset*/-1, builder);
-        
+        auto evenSubview = getOffsetSubviewFrom(subviews[idx], /*idx*/1, /*offset*/-1, builder);
         subviews[idx].replaceAllUsesWith(evenSubview.getOperation());
         subviews[idx] = evenSubview;
       }
-      auto doubleF32Value = builder.create<ftm::MemRefLoadOp>(loc, elem64BitTy, subviews[idx]);
-      auto bcastValue = builder.create<ftm::BroadcastOp>(loc, elem1024BitTy, doubleF32Value);
+      auto loadOp  = builder.create<ftm::MemRefLoadOp>(loc, elem64BitTy, subviews[idx]);
+      loadOp->setAttr(ftm::MemLevelAttr::name, MemLevelAttr::get(ctx, OperandMemLevels[idx]));
+      auto bcastValue = builder.create<ftm::BroadcastOp>(loc, elem1024BitTy, loadOp);
       if(unrollSegmentId % 2 == 1)
         fmaOperands[idx] = builder.create<ftm::Vbale2hOp>(loc, elem1024BitTy, bcastValue);
       else
         fmaOperands[idx] = builder.create<ftm::Vbale2lOp>(loc, elem1024BitTy, bcastValue);
     }
-    fmaOperands[idx].getDefiningOp()->setAttr(ftm::MemLevelAttr::name,
-      MemLevelAttr::get(ctx, OperandMemLevels[idx]));
   }
 
   auto vectorFMA = builder.create<ftm::FMAOp>(loc,

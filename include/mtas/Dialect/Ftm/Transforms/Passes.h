@@ -61,6 +61,9 @@ std::unique_ptr<Pass> createCastPtrToInt64Pass();
 /// Create a pass to fold register alloca
 std::unique_ptr<Pass> createFoldRegisterAllocaPass();
 
+/// Create a pass to allocate offset registers
+std::unique_ptr<Pass> createAllocateOffsetRegistersPass();
+
 //===----------------------------------------------------------------------===//
 // Registration
 //===----------------------------------------------------------------------===//

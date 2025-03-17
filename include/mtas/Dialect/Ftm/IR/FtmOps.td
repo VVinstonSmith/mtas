@@ -151,19 +151,16 @@ def Ftm_VFMAOp :
 }
 
 def Ftm_LoadOp : Ftm_Op<"load", [Pure]> {
-  let arguments = (ins LLVM_AnyPointer:$addr);
+  let arguments = (ins LLVM_AnyPointer:$addr, Variadic<I64>:$offsetRegister);
   let results = (outs LLVM_LoadableType:$res);
   let assemblyFormat = [{
-    $addr attr-dict `:` qualified(type($addr)) `->` type($res)
+    $addr `,` $offsetRegister attr-dict `:` qualified(type($addr)) `->` type($res)
   }];
-  // let extraClassDeclaration = [{
-  //   void getEffects(
-  //       SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>> &
-  //       effects) {
-  //     effects.emplace_back(MemoryEffects::Read::get(), getAddr(),
-  //                          SideEffects::DefaultResource::get());
-  //   }
-  // }];
+  let extraClassDeclaration = [{
+    void setOffsetRegister(Value reg) {
+      setOperand(1, reg);
+    }
+  }];
 }
 
 def Ftm_StoreOp : Ftm_Op<"store"> {
@@ -197,6 +194,14 @@ def Ftm_DeclareRegisterOp: Ftm_Op<"declare_register">,
     Results<(outs AnyType:$output)> {
   let summary = "declare register operation";
   let assemblyFormat = "attr-dict `:` type($output)";
+}
+
+def Ftm_SmoviOp :
+  Op<Ftm_Dialect, "smovi">,
+    Arguments<(ins I64Attr:$imm, I64:$reg)>,
+    Results<(outs I64:$result)> {
+  let summary = "scalar move immediate number";
+  let assemblyFormat = "$imm `,` $reg attr-dict `:` type($result)";
 }
 
 

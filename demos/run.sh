@@ -20,6 +20,8 @@
     -loop-folding \
     -fold-register-alloca \
     -cse -canonicalize -cse \
+    -allocate-offset-registers \
+    -cse -canonicalize -cse \
     
     # -cse -canonicalize -cse \
 

@@ -181,5 +181,13 @@ def FoldRegisterAlloca : Pass<"fold-register-alloca", "func::FuncOp"> {
   ];
 }
 
+def AllocateOffsetRegisters : Pass<"allocate-offset-registers", "func::FuncOp"> {
+  let summary = "A pass to allocate offset registers";
+  let constructor = "mlir::ftm::createAllocateOffsetRegistersPass()";
+  let dependentDialects = [
+    "ftm::FtmDialect",
+  ];
+}
+
 
 #endif // MTAS_DIALECT_FTM_TRANSFORMS_PASSES
