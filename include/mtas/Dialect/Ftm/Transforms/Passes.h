@@ -34,8 +34,8 @@ namespace ftm {
 /// Create a pass to do multi-buffering
 std::unique_ptr<Pass> createMultiBufferingPass();
 
-/// Create a pass to tile dynamic dimensions
-std::unique_ptr<Pass> createTileDynamicDimsPass();
+/// Create a pass to tile dimensions of linalg op
+std::unique_ptr<Pass> createTileLinalgDimsPass();
 
 /// Create a pass to unroll the innermost loop
 std::unique_ptr<Pass> createLoopUnrollingPass();
@@ -63,6 +63,9 @@ std::unique_ptr<Pass> createFoldRegisterAllocaPass();
 
 /// Create a pass to allocate offset registers
 std::unique_ptr<Pass> createAllocateOffsetRegistersPass();
+
+/// Create a pass to lower fill ops
+std::unique_ptr<Pass> createLowerFillOpsPass();
 
 //===----------------------------------------------------------------------===//
 // Registration

@@ -1,4 +1,4 @@
-//===--------- TileDynamicDims.cpp - Tile Dynamic Dimensions Pass ---------===//
+//===--------- TileLinalgDims.cpp - Tile Linalg Dimensions Pass ---------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -21,7 +21,7 @@
 using namespace std;
 
 namespace mlir {
-#define GEN_PASS_DEF_TILEDYNAMICDIMS
+#define GEN_PASS_DEF_TILELINALGDIMS
 #include "mtas/Dialect/Ftm/Transforms/Passes.h.inc"
 } // namespace mlir
 
@@ -48,9 +48,19 @@ static SmallVector<OpFoldResult> getMixedSizes(OpBuilder& builder,
 std::pair<SmallVector<Operation*>, SmallVector<Operation*>>
 applyTiling(Operation* targetOp,
     SmallVector<int64_t> staticSizes, SmallVector<Value> dynamicSizes) {
+  { // discard entirely zero staticSizes
+    int noneZeroCnt = 0;
+    for(int64_t dimIdx = 0; dimIdx < staticSizes.size(); dimIdx++) {
+      if(staticSizes[dimIdx] != 0)
+        noneZeroCnt++;
+    }
+    if(noneZeroCnt == 0)
+      return {{targetOp}, {}}; 
+  }
+
   auto ctx = targetOp->getContext();
   IRRewriter rewriter(ctx);
-
+  
   auto tilingInterface = dyn_cast<TilingInterface>(targetOp);
   if (!tilingInterface) {
     llvm::errs() << "only ops implementing TilingInterface are supported";
@@ -93,7 +103,7 @@ applyTiling(Operation* targetOp,
   return std::make_pair(tiled, loops);
 }
 
-bool implDynamicDimsTiling(Operation* op) {
+bool implLinalgOpTiling(Operation* op) {
   auto ctx = op->getContext();
   auto linalgOp = cast<linalg::LinalgOp>(op);
 
@@ -102,37 +112,44 @@ bool implDynamicDimsTiling(Operation* op) {
     llvm::errs() << "Operands of linalgOp need memory level attrs.";
     return false;
   }
-  auto OperandMemLevels = memLevelAttrs.cast<ftm::OperandMemLevelAttr>().getMemLevels();
+  auto OperandMemLevels = 
+      memLevelAttrs.cast<ftm::OperandMemLevelAttr>().getMemLevels();
 
   auto nLoops = linalgOp.getNumLoops();
-  SmallVector<int64_t> tileSizes(nLoops, 32);
-  SmallVector<int64_t> staticTileSizes(nLoops, 0);
-  SmallVector<int64_t> dynamicTileSizes(nLoops, 0);
+  SmallVector<int64_t> tileSizes(nLoops, 1);
 
+  // find out vector dimensions
   for(auto [oprIdx, oprIdxMap] : llvm::enumerate(linalgOp.getIndexingMapsArray())) {
+    if(OperandMemLevels[oprIdx] == ftm::Cache::Unknown)
+      continue;
+    auto operand = linalgOp->getOperand(oprIdx);
+    auto memrefType = operand.getType().cast<MemRefType>();
+    if(OperandMemLevels[oprIdx] == Cache::AM ||
+        OperandMemLevels[oprIdx] == Cache::VectorRegister)
+      tileSizes[oprIdxMap.getDimPosition(memrefType.getRank() - 1)] = 32;
+  }
+
+  SmallVector<int64_t> outerTileSizes(nLoops, 0);
+  SmallVector<int64_t> innerTileSizes(nLoops, 0);
+
+  // classify outer loops and inner loops
+  for(auto [oprIdx, oprIdxMap] : llvm::enumerate(linalgOp.getIndexingMapsArray())) {
+    if(OperandMemLevels[oprIdx] == ftm::Cache::Unknown)
+      continue;
     auto operand = linalgOp->getOperand(oprIdx);
     auto memrefType = operand.getType().cast<MemRefType>();
     for(int64_t dimIdx = 0; dimIdx < memrefType.getRank(); dimIdx++) {
       auto linalgDimIdx = oprIdxMap.getDimPosition(dimIdx);
-      // find out vector dimensions
-      if(OperandMemLevels[oprIdx] == Cache::SM)
-        tileSizes[linalgDimIdx] = 1;
-      // find out dynamic dimensions
-      if(!memrefType.isDynamicDim(dimIdx) &&
-          memrefType.getDimSize(dimIdx) / tileSizes[linalgDimIdx] < 16)
-        continue;
-      dynamicTileSizes[linalgDimIdx] = 1; // dynamic or very long
+      if(memrefType.getDimSize(dimIdx) / tileSizes[linalgDimIdx] < 16) {
+        innerTileSizes[linalgDimIdx] = tileSizes[linalgDimIdx];
+      } else {
+        outerTileSizes[linalgDimIdx] = tileSizes[linalgDimIdx];
+      }
     }
   }
-  
-  for(int64_t idx = 0; idx < nLoops; idx++) {
-    staticTileSizes[idx] = (dynamicTileSizes[idx] == 0) ? 1 : 0;
-    staticTileSizes[idx] *= tileSizes[idx];
-    dynamicTileSizes[idx] *= tileSizes[idx];
-  }
 
-  auto [outerTiledOp, outerLoops] = applyTiling(op, dynamicTileSizes, {});
-  auto [innerTiledOp, innerLoops] = applyTiling(outerTiledOp.back(), staticTileSizes, {});
+  auto [outerTiledOp, outerLoops] = applyTiling(op, outerTileSizes, {});
+  auto [innerTiledOp, innerLoops] = applyTiling(outerTiledOp.back(), innerTileSizes, {});
 
   unsigned loopId = 0;
   for(auto loop : outerLoops) {
@@ -155,31 +172,35 @@ bool implDynamicDimsTiling(Operation* op) {
       return false;
     }
   }
-
+  return true;
 }
 
 } // namepsace
 
 namespace mlir {
-class TileDynamicDimsPass : public impl::TileDynamicDimsBase<TileDynamicDimsPass> {
+class TileLinalgDimsPass : public impl::TileLinalgDimsBase<TileLinalgDimsPass> {
 public:
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
-
     funcOp.walk([&](Operation* op) {
       if(op->getParentOp() != funcOp)
         return WalkResult::skip();
-
-      if(isa<linalg::MatmulOp>(op)) {
-        implDynamicDimsTiling(op);
-      }
       
+      if(isa<linalg::LinalgOp>(op)) {
+        if(isa<linalg::MatmulOp>(op))
+          implLinalgOpTiling(op);
+        else if(isa<linalg::AddOp>(op))
+          implLinalgOpTiling(op);
+        else if(isa<linalg::FillOp>(op))
+          implLinalgOpTiling(op);
+      }
+
       return WalkResult::advance();
     });
   }
 };
 } // namespace mlir
 
-std::unique_ptr<Pass> mlir::ftm::createTileDynamicDimsPass() {
-  return std::make_unique<TileDynamicDimsPass>();
+std::unique_ptr<Pass> mlir::ftm::createTileLinalgDimsPass() {
+  return std::make_unique<TileLinalgDimsPass>();
 }

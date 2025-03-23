@@ -58,41 +58,52 @@ bool implMatmulSpliting(linalg::MatmulOp matmulOp) {
   auto ctx = matmulOp.getContext();
   OpBuilder builder(ctx);
 
-  SmallVector<mlir::ftm::Matrix, 3> operandMatNames;
-  SmallVector<mlir::ftm::Cache, 3> operandMemLevels;
+  SmallVector<mlir::ftm::Cache, 3> matmulOpOperandMemLevels;
   for(auto operand : matmulOp.getOperands()) {
     auto [operandMatName, operandMemLevel] = getOperandNameAndMemLevel(operand);
-    operandMatNames.push_back(operandMatName);
-    operandMemLevels.push_back(operandMemLevel);
+    matmulOpOperandMemLevels.push_back(operandMemLevel);
   }
-  matmulOp->setAttr(ftm::OperandMatrixNameAttr::name,
-      ftm::OperandMatrixNameAttr::get(ctx, operandMatNames));
-  matmulOp->setAttr(ftm::OperandMemLevelAttr::name,
-      ftm::OperandMemLevelAttr::get(ctx, operandMemLevels));
+
+  ftm::Cache tmpMemC_memLevel = ftm::Cache::Unknown;
+  ftm::Cache matC_memLevel = matmulOpOperandMemLevels[2];
+
+  if(matC_memLevel == ftm::Cache::AM) {
+    tmpMemC_memLevel = 
+        matmulOpOperandMemLevels[2] = ftm::Cache::VectorRegister;
+  } else if(matC_memLevel == ftm::Cache::SM) {
+    tmpMemC_memLevel = 
+        matmulOpOperandMemLevels[2] = ftm::Cache::ScalarRegister;
+  }
 
   builder.setInsertionPoint(matmulOp);
 
   auto matC = matmulOp.getDpsInits()[0];
-  auto tmpMemC = builder.create<memref::AllocaOp>(loc, matC.getType().cast<MemRefType>());
-  if(operandMemLevels[2] == ftm::Cache::AM) {
-    operandMemLevels[2] = ftm::Cache::VectorRegister;
-  } else if(operandMemLevels[2] == ftm::Cache::SM) {
-    operandMemLevels[2] = ftm::Cache::ScalarRegister;
-  }
-  tmpMemC->setAttr(ftm::OperandMatrixNameAttr::name,
-      ftm::OperandMatrixNameAttr::get(ctx, operandMatNames[2]));
+  auto tmpMemC = builder.create<memref::AllocaOp>(loc, 
+      matC.getType().cast<MemRefType>());
   tmpMemC->setAttr(ftm::MemLevelAttr::name,
-      ftm::MemLevelAttr::get(ctx, operandMemLevels[2]));
+      ftm::MemLevelAttr::get(ctx, tmpMemC_memLevel));
+  
   matmulOp.setDpsInitOperand(0, tmpMemC);
   matmulOp->setAttr(ftm::OperandMemLevelAttr::name,
-      ftm::OperandMemLevelAttr::get(ctx, operandMemLevels));
+      ftm::OperandMemLevelAttr::get(ctx, matmulOpOperandMemLevels));
 
-  auto c0_f32 = builder.create<arith::ConstantFloatOp>(loc, llvm::APFloat(0.0f), builder.getF32Type());
-  auto fillZeroOp = builder.create<linalg::FillOp>(loc, ValueRange{c0_f32}, tmpMemC.getResult());
+  auto c0_f32 = builder.create<arith::ConstantFloatOp>(loc, 
+      llvm::APFloat(0.0f), builder.getF32Type());
+  auto fillZeroOp = builder.create<linalg::FillOp>(loc,
+      ValueRange{c0_f32}, tmpMemC.getResult());    
+  SmallVector<mlir::ftm::Cache, 2> fillOpOperandMemLevels = {
+      ftm::Cache::Unknown, tmpMemC_memLevel};
+  fillZeroOp->setAttr(ftm::OperandMemLevelAttr::name,
+      ftm::OperandMemLevelAttr::get(ctx, fillOpOperandMemLevels));
   
   builder.setInsertionPointAfter(matmulOp);
-  auto addtionOp = builder.create<linalg::AddOp>(loc, ValueRange{matC, tmpMemC}, matC);
-  
+
+  auto addtionOp = builder.create<linalg::AddOp>(loc,
+      ValueRange{matC, tmpMemC}, matC);
+  SmallVector<mlir::ftm::Cache, 3> addOpOperandMemLevels = {
+      matC_memLevel, tmpMemC_memLevel, matC_memLevel};
+  addtionOp->setAttr(ftm::OperandMemLevelAttr::name,
+      ftm::OperandMemLevelAttr::get(ctx, addOpOperandMemLevels));
 }
 
 } // namepsace

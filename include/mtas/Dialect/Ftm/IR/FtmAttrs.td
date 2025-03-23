@@ -144,4 +144,16 @@ def Ftm_RegisterIdAttr : Ftm_Attr<"RegisterId", "register_id"> {
   }];
 }
 
+def Ftm_RegisterIndicesAttr : Ftm_Attr<"RegisterIndices", "register_indices"> {
+  let parameters = (ins 
+    OptionalArrayRefParameter<"unsigned">:$indices
+  );
+  let assemblyFormat = "`<` params `>`";
+  let description = [{
+    register indices
+  }];
+}
+
+
+
 #endif // FTM_IR_FTMATTRS

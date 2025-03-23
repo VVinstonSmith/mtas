@@ -46,6 +46,22 @@ LLVM::AllocaOp searchAllocaFromPtr(Value ptr) {
   return nullptr;
 }
 
+DenseSet<unsigned> scanAllocatedRegisters(func::FuncOp funcOp, ftm::Cache memLevel) {
+  DenseSet<unsigned> allocated;
+  funcOp.walk([&](ftm::DeclareRegisterOp op) {
+    if(auto attr = op->getAttr(ftm::MemLevelAttr::name)) {
+      if(attr.cast<ftm::MemLevelAttr>().getLevel() != memLevel)
+        return WalkResult::skip();
+    } else return WalkResult::skip();
+    if(auto attr = op->getAttr(ftm::RegisterIdAttr::name)) {
+      unsigned id = attr.cast<ftm::RegisterIdAttr>().getId();
+      allocated.insert(id);
+    }
+    return WalkResult::advance();
+  });
+  return allocated;
+}
+
 void implRegisterFolding(LLVM::AllocaOp allocaOp) {
   auto loc = allocaOp.getLoc();
   auto ctx = allocaOp.getContext();
@@ -69,16 +85,27 @@ void implRegisterFolding(LLVM::AllocaOp allocaOp) {
   if(n_regs == 0)
     return;
 
+  DenseSet<unsigned> allocatedIds = scanAllocatedRegisters(
+      allocaOp->getParentOfType<func::FuncOp>(), memLevel); 
+
   OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPointAfter(allocaOp);
 
+  SmallVector<unsigned> registerIndices;
   Type outputType = VectorType::get({elemSize}, builder.getF32Type());
-  for(int64_t idx = 0; idx < n_regs; idx++) {
+
+  for(int64_t idx = 0; n_regs != 0 ; idx++) {
+    if(allocatedIds.count(idx))
+      continue;
     auto declareOp = builder.create<ftm::DeclareRegisterOp>(loc, outputType);
     declareOp->setAttr(ftm::MemLevelAttr::name, memLevelAttr);
     declareOp->setAttr(ftm::RegisterIdAttr::name,
-        ftm::RegisterIdAttr::get(ctx, idx));  
+        ftm::RegisterIdAttr::get(ctx, idx)); 
+    registerIndices.push_back(idx);
+    n_regs--;
   }
+  allocaOp->setAttr(ftm::RegisterIndicesAttr::name,
+      ftm::RegisterIndicesAttr::get(ctx, registerIndices));
 }
 
 std::pair<LLVM::AllocaOp, int64_t>
@@ -192,6 +219,8 @@ public:
       return WalkResult::advance();
     });
     funcOp.walk([&](LLVM::AllocaOp op) {
+      if(op->getAttr(ftm::RegisterIndicesAttr::name))
+        return WalkResult::skip();
       if(auto attr = op->getAttr(ftm::MemLevelAttr::name)) 
         implRegisterFolding(op);
       return WalkResult::advance();

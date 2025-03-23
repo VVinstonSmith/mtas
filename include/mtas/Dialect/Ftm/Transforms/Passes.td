@@ -81,9 +81,9 @@ def MultiBuffering : Pass<"ftm-multi-buffering", "func::FuncOp"> {
   ];
 }
 
-def TileDynamicDims : Pass<"tile-dynamic-dims", "func::FuncOp"> {
-  let summary = "A pass to tile dynamic dimensions";
-  let constructor = "mlir::ftm::createTileDynamicDimsPass()";
+def TileLinalgDims : Pass<"tile-linalg-dims", "func::FuncOp"> {
+  let summary = "A pass to tile dimensions of linalg op";
+  let constructor = "mlir::ftm::createTileLinalgDimsPass()";
   let dependentDialects = [
     "linalg::LinalgDialect",
     "scf::SCFDialect",
@@ -189,5 +189,13 @@ def AllocateOffsetRegisters : Pass<"allocate-offset-registers", "func::FuncOp"> 
   ];
 }
 
+def LowerFillOps : Pass<"lower-fill-ops", "func::FuncOp"> {
+  let summary = "A pass to lower fill ops";
+  let constructor = "mlir::ftm::createLowerFillOpsPass()";
+  let dependentDialects = [
+    "LLVM::LLVMDialect",
+    "ftm::FtmDialect",
+  ];
+}
 
 #endif // MTAS_DIALECT_FTM_TRANSFORMS_PASSES
