@@ -165,9 +165,9 @@ def Ftm_LoadOp : Ftm_Op<"load", [Pure]> {
 
 def Ftm_StoreOp : Ftm_Op<"store"> {
   let arguments = (ins LLVM_LoadableType:$value,
-                       LLVM_AnyPointer:$addr);
+                       LLVM_AnyPointer:$addr, Variadic<I64>:$offsetRegister);
   let assemblyFormat = [{
-    $value `,` $addr attr-dict `:` type($value) `,` qualified(type($addr))
+    $value `,` $addr `,` $offsetRegister attr-dict `:` type($value) `,` qualified(type($addr))
   }];
   let extraClassDeclaration = [{
     void getEffects(

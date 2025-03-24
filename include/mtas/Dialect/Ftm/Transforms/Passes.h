@@ -64,9 +64,6 @@ std::unique_ptr<Pass> createFoldRegisterAllocaPass();
 /// Create a pass to allocate offset registers
 std::unique_ptr<Pass> createAllocateOffsetRegistersPass();
 
-/// Create a pass to lower fill ops
-std::unique_ptr<Pass> createLowerFillOpsPass();
-
 //===----------------------------------------------------------------------===//
 // Registration
 //===----------------------------------------------------------------------===//

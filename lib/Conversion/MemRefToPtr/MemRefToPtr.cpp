@@ -103,7 +103,7 @@ public:
         alignedPtr,                                // base ptr
         offset,                                    // offset
         /*inbounds=*/true);                        // set inbounds tag
-    auto storeOp = rewriter.create<ftm::StoreOp>(loc, value, offsetPtr);
+    auto storeOp = rewriter.create<ftm::StoreOp>(loc, value, offsetPtr, ValueRange{});
     storeOp->setAttrs(op->getAttrs());
     rewriter.replaceOp(op, storeOp);
     return success();

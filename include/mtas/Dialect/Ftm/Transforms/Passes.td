@@ -189,13 +189,4 @@ def AllocateOffsetRegisters : Pass<"allocate-offset-registers", "func::FuncOp"> 
   ];
 }
 
-def LowerFillOps : Pass<"lower-fill-ops", "func::FuncOp"> {
-  let summary = "A pass to lower fill ops";
-  let constructor = "mlir::ftm::createLowerFillOpsPass()";
-  let dependentDialects = [
-    "LLVM::LLVMDialect",
-    "ftm::FtmDialect",
-  ];
-}
-
 #endif // MTAS_DIALECT_FTM_TRANSFORMS_PASSES

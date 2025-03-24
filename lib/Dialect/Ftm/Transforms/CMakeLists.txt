@@ -10,7 +10,6 @@ add_mlir_dialect_library(MLIRFtmTransforms
     CastPtrToInt64.cpp
     FoldRegisterAlloca.cpp
     AllocateOffsetRegisters.cpp
-    LowerFillOps.cpp
 
     ADDITIONAL_HEADER_DIRS
     ${MTAS_SOURCE_DIR}/include/mtas/Dialect/Ftm
