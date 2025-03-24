@@ -197,13 +197,32 @@ def Ftm_DeclareRegisterOp: Ftm_Op<"declare_register">,
 }
 
 def Ftm_SmoviOp :
-  Op<Ftm_Dialect, "smovi">,
+  Op<Ftm_Dialect, "smovi", [Pure]>,
     Arguments<(ins I64Attr:$imm, I64:$reg)>,
     Results<(outs I64:$result)> {
   let summary = "scalar move immediate number";
   let assemblyFormat = "$imm `,` $reg attr-dict `:` type($result)";
 }
 
+def Ftm_MoviOp :
+  Op<Ftm_Dialect, "movi", [Pure, AllTypesMatch<["reg", "result"]>]>,
+    Arguments<(ins I64Attr:$imm, VectorOfAnyRankOf<[AnyFloat]>:$reg)>,
+    Results<(outs VectorOfAnyRankOf<[AnyFloat]>:$result)> {
+  let summary = "vector move immediate number";
+  let assemblyFormat = "$imm `,` $reg attr-dict `:` type($result)";
+  let extraClassDeclaration = [{
+    VectorType getVectorType() { return ::llvm::cast<VectorType>(getReg().getType()); }
+  }];
+}
 
+def Ftm_VmoviOp :
+  Op<Ftm_Dialect, "vmovi", [AllTypesMatch<["reg"]>]>,
+    Arguments<(ins I64Attr:$imm, VectorOfAnyRankOf<[AnyFloat]>:$reg)> {
+  let summary = "vector move immediate number";
+  let assemblyFormat = "$imm `,` $reg attr-dict `:` type($reg)";
+  let extraClassDeclaration = [{
+    VectorType getVectorType() { return ::llvm::cast<VectorType>(getReg().getType()); }
+  }];
+}
 
 #endif // FTM_IR_FTMOPS

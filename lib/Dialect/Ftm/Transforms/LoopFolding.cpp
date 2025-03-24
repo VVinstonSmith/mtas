@@ -144,7 +144,7 @@ void simplifyMuliOp(arith::MulIOp muliOp) {
 }
 
 /// b = cst + a -> b = a + cst
-void exchangeConstToLeft(arith::AddIOp op) {
+void swapConstOperandToRight(arith::AddIOp op) {
   auto loc = op.getLoc();
   auto ctx = op.getContext();
   OpBuilder builder(ctx);
@@ -292,7 +292,7 @@ public:
     runMoveUpCastIndexToI64(funcOp);
 
     funcOp.walk([&](arith::AddIOp op) {
-      exchangeConstToLeft(op);
+      swapConstOperandToRight(op);
       return WalkResult::advance();
     });
 

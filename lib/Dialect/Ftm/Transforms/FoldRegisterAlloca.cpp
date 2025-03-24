@@ -134,14 +134,7 @@ searchAllocaAndOffsetFromPtr(Value ptr) {
 }
 
 Value searchRegisterDeclareWith(
-    func::FuncOp funcOp, Attribute memLevelAttr, int64_t offset) {
-  ftm::Cache memLevel = memLevelAttr.cast<ftm::MemLevelAttr>().getLevel();
-  if(!unitLengthOf.count(memLevel)) {
-    llvm::errs() << "memory level must be scalar/vector register\n";
-    return nullptr;
-  }
-  int64_t elemSize = unitLengthOf.at(memLevel);
-
+    func::FuncOp funcOp, Attribute memLevelAttr, int64_t registerId) {
   Value declareRegisterValue;
   funcOp.walk([&](ftm::DeclareRegisterOp op) {
     if(auto memLevelAttr_1 = op->getAttr(ftm::MemLevelAttr::name)) {
@@ -149,8 +142,10 @@ Value searchRegisterDeclareWith(
         return WalkResult::skip();
       if(auto attr = op->getAttr(ftm::RegisterIdAttr::name)) {
         int64_t regId = attr.cast<ftm::RegisterIdAttr>().getId();
-        if(regId == offset / elemSize)
+        if(regId == registerId) {
           declareRegisterValue = op.getResult();
+          return WalkResult::interrupt();
+        }
       }
     }
     return WalkResult::advance();
@@ -182,8 +177,12 @@ bool replaceLoadAndStoreWithRegister(Operation* op) {
     llvm::errs() << "alloca must have memory level attr\n";
     return false;
   }
+  ftm::Cache memLevel = memLevelAttr.cast<ftm::MemLevelAttr>().getLevel();
+  auto registerIndices = alloca->getAttr(
+      ftm::RegisterIndicesAttr::name).cast<ftm::RegisterIndicesAttr>().getIndices();
   auto funcOp = op->getParentOfType<func::FuncOp>();
-  auto regDecVal = searchRegisterDeclareWith(funcOp, memLevelAttr, offset);
+  auto regDecVal = searchRegisterDeclareWith(
+      funcOp, memLevelAttr, registerIndices[offset / unitLengthOf.at(memLevel)]);
   if(!regDecVal)
     return false;
   if(auto loadOp = dyn_cast<ftm::LoadOp>(op)) {
@@ -191,13 +190,15 @@ bool replaceLoadAndStoreWithRegister(Operation* op) {
     loadOp.erase();
   } else if(auto storeOp = dyn_cast<ftm::StoreOp>(op)) {
     auto defOp = storeOp.getValue().getDefiningOp();
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPointAfter(defOp);
     if(auto fma = dyn_cast<ftm::FMAOp>(defOp)) {
-      OpBuilder::InsertionGuard guard(builder);
-      builder.setInsertionPointAfter(defOp);
       builder.create<ftm::VFMAOp>(loc,
           fma.getLhs(), fma.getRhs(), fma.getAcc(), regDecVal);
-      storeOp.erase();
+    } else if(auto movi = dyn_cast<ftm::MoviOp>(defOp)) {
+      builder.create<ftm::VmoviOp>(loc, movi.getImm(), movi.getReg());
     }
+    storeOp.erase();
   }
   return true;
 }

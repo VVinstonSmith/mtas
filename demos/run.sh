@@ -6,22 +6,23 @@
     -tile-linalg-dims \
     -cse -canonicalize \
     -loop-unrolling \
+    -cse -canonicalize -cse \
     -lower-matmul-to-fma \
-    # -cse -canonicalize -cse \
-    # -fold-memref-alias-ops \
-    # -convert-memref-to-ptr \
-    # -expand-strided-metadata \
-    # -finalize-memref-to-llvm \
-    # -lower-affine \
-    # -cse -canonicalize -cse \
-    # -loop-invariant-code-motion \
-    # -cse -canonicalize -cse \
-    # -cast-ptr-to-int64 \
-    # -loop-folding \
-    # -fold-register-alloca \
-    # -cse -canonicalize -cse \
-    # -allocate-offset-registers \
-    # -cse -canonicalize -cse \
+    -cse -canonicalize -cse \
+    -fold-memref-alias-ops \
+    -convert-memref-to-ptr \
+    -expand-strided-metadata \
+    -finalize-memref-to-llvm \
+    -lower-affine \
+    -cse -canonicalize -cse \
+    -loop-invariant-code-motion \
+    -cse -canonicalize -cse \
+    -cast-ptr-to-int64 \
+    -loop-folding \
+    -fold-register-alloca \
+    -cse -canonicalize -cse \
+    -allocate-offset-registers \
+    -cse -canonicalize -cse \
     
     # -cse -canonicalize -cse \
 
