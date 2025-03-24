@@ -7,7 +7,7 @@
     -cse -canonicalize \
     -loop-unrolling \
     -cse -canonicalize -cse \
-    -lower-matmul-to-fma \
+    -lower-linalg-ops \
     -cse -canonicalize -cse \
     -fold-memref-alias-ops \
     -convert-memref-to-ptr \
@@ -19,6 +19,7 @@
     -cse -canonicalize -cse \
     -cast-ptr-to-int64 \
     -loop-folding \
+    -cse -canonicalize -cse \
     -fold-register-alloca \
     -cse -canonicalize -cse \
     -allocate-offset-registers \

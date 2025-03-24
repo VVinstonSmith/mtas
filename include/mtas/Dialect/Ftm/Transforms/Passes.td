@@ -128,9 +128,9 @@ def SplitMatmul : Pass<"split-matmul", "func::FuncOp"> {
   ];
 }
 
-def LowerMatmulToFma : Pass<"lower-matmul-to-fma", "func::FuncOp"> {
-  let summary = "A pass to lower linalg.matmul to fma";
-  let constructor = "mlir::ftm::createLowerMatmulToFmaPass()";
+def LowerLinalgOps : Pass<"lower-linalg-ops", "func::FuncOp"> {
+  let summary = "A pass to lower linalg ops";
+  let constructor = "mlir::ftm::createLowerLinalgOpsPass()";
   let dependentDialects = [
     "linalg::LinalgDialect",
     "scf::SCFDialect",

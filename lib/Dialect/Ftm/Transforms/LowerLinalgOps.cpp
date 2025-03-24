@@ -1,4 +1,4 @@
-//===----------------- LowerMatmulToFma.cpp - lower matmul to fma ops -----------------===//
+//===----------------- LowerLinalgOps.cpp - lower linalg ops -----------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -21,7 +21,7 @@
 using namespace std;
 
 namespace mlir {
-#define GEN_PASS_DEF_LOWERMATMULTOFMA
+#define GEN_PASS_DEF_LOWERLINALGOPS
 #include "mtas/Dialect/Ftm/Transforms/Passes.h.inc"
 } // namespace mlir
 
@@ -232,7 +232,7 @@ bool implAddOpLowering(Operation *op) {
   
   builder.setInsertionPoint(addOp);
   auto fmaOp = builder.create<ftm::FMAOp>(loc,
-      decOutputType, addOpOperands[0], addOpOperands[1], cstOneOperand);
+      decOutputType, addOpOperands[0], cstOneOperand, addOpOperands[1]);
 
   auto storeValue = builder.create<ftm::MemRefStoreOp>(loc, 
       fmaOp.getResult(), subviews[2]);
@@ -316,7 +316,7 @@ bool implFillOpLowering(Operation *op) {
 } // namepsace
 
 namespace mlir {
-class LowerMatmulToFmaPass : public impl::LowerMatmulToFmaBase<LowerMatmulToFmaPass> {
+class LowerLinalgOpsPass : public impl::LowerLinalgOpsBase<LowerLinalgOpsPass> {
 public:
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
@@ -338,6 +338,6 @@ public:
 };
 } // namespace mlir
 
-std::unique_ptr<Pass> mlir::ftm::createLowerMatmulToFmaPass() {
-  return std::make_unique<LowerMatmulToFmaPass>();
+std::unique_ptr<Pass> mlir::ftm::createLowerLinalgOpsPass() {
+  return std::make_unique<LowerLinalgOpsPass>();
 }

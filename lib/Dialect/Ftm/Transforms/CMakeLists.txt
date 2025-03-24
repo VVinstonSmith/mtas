@@ -5,7 +5,7 @@ add_mlir_dialect_library(MLIRFtmTransforms
     LoopFolding.cpp
     SplitMatmul.cpp
     LowerKernelArguments.cpp
-    LowerMatmulToFma.cpp
+    LowerLinalgOps.cpp
     LowerLoadAndStoreMemRefToPtr.cpp
     CastPtrToInt64.cpp
     FoldRegisterAlloca.cpp

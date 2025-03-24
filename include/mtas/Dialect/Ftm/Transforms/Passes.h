@@ -46,8 +46,8 @@ std::unique_ptr<Pass> createLoopFoldingPass();
 /// Create a pass to split linalg.matmul
 std::unique_ptr<Pass> createSplitMatmulPass();
 
-/// Create a pass to lower linalg.matmul to fma ops
-std::unique_ptr<Pass> createLowerMatmulToFmaPass();
+/// Create a pass to lower linalg ops
+std::unique_ptr<Pass> createLowerLinalgOpsPass();
 
 /// Create a pass to lower kernel arguments
 std::unique_ptr<Pass> createLowerKernelArgumentsPass();
