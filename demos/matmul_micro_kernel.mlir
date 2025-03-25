@@ -41,8 +41,7 @@ module {
     %B: memref<512x64xf32> {ftm.memory_level = #ftm.memory_level<am>}, 
     %C: memref<3x64xf32> {ftm.memory_level = #ftm.memory_level<am>})
   {
-    linalg.matmul {ftm.unroll_loop_number = #ftm.unroll_loop_number<2>}
-      ins(%A, %B : memref<3x512xf32>, memref<512x64xf32>) outs(%C : memref<3x64xf32>)
+    linalg.matmul {ftm.unroll_loop_number = #ftm.unroll_loop_number<2>} ins(%A, %B : memref<3x512xf32>, memref<512x64xf32>) outs(%C : memref<3x64xf32>)
     return
   }
 }

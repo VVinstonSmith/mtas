@@ -42,7 +42,12 @@ void castFuncArgPtrToI64(func::FuncOp funcOp, int64_t argIdx) {
     if(auto gepOp = dyn_cast<LLVM::GEPOp>(userOp)) {
       OpBuilder::InsertionGuard guard(builder);
       builder.setInsertionPoint(gepOp);
-      auto AddOp = builder.create<arith::AddIOp>(loc, argVal_i64, gepOp.getOperand(1));
+      auto offsetBytes = builder.create<arith::MulIOp>(loc,
+          gepOp.getOperand(1),
+          builder.create<arith::ConstantIntOp>(loc, 4, builder.getI64Type()));
+      auto AddOp = builder.create<arith::AddIOp>(loc, argVal_i64, offsetBytes);
+
+      // auto AddOp = builder.create<arith::AddIOp>(loc, argVal_i64, gepOp.getOperand(1));
       auto result_ptr = builder.create<ftm::CastOp>(loc, 
           builder.getType<LLVM::LLVMPointerType>(), AddOp.getResult());
       gepOp.getResult().replaceAllUsesWith(result_ptr.getResult());

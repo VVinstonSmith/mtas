@@ -108,15 +108,15 @@ void eliminateConstantCast(func::FuncOp funcOp) {
 }
 
 /// (a + b) * c -> (a * c) + (b * c) 
-void simplifyMuliOp(arith::MulIOp muliOp) {
+bool simplifyMuliOp(arith::MulIOp muliOp) {
   auto defOp_lhs = muliOp.getLhs().getDefiningOp();
   auto defOp_rhs = muliOp.getRhs().getDefiningOp();
   if((!defOp_lhs || !isa<arith::AddIOp>(defOp_lhs)) && 
       (!defOp_rhs || !isa<arith::AddIOp>(defOp_rhs)))
-    return;
+    return false;
   if(defOp_lhs && isa<arith::AddIOp>(defOp_lhs) && 
       defOp_rhs && isa<arith::AddIOp>(defOp_rhs))
-    return;
+    return false;
   Value addi_lhs, addi_rhs, muli_opr;
   if(defOp_lhs)
     if(auto addiOp = dyn_cast<arith::AddIOp>(defOp_lhs)) {
@@ -141,10 +141,12 @@ void simplifyMuliOp(arith::MulIOp muliOp) {
   auto new_rhs = builder.create<arith::MulIOp>(loc, addi_rhs, muli_opr);
   auto new_addi = builder.create<arith::AddIOp>(loc, new_lhs, new_rhs);
   muliOp.getResult().replaceAllUsesWith(new_addi.getResult());
+  muliOp.erase();
+  return true;
 }
 
 /// b = cst + a -> b = a + cst
-void swapConstOperandToRight(arith::AddIOp op) {
+bool swapConstOperandToRight(arith::AddIOp op) {
   auto loc = op.getLoc();
   auto ctx = op.getContext();
   OpBuilder builder(ctx);
@@ -154,8 +156,11 @@ void swapConstOperandToRight(arith::AddIOp op) {
       builder.setInsertionPoint(op);
       auto newOp = builder.create<arith::AddIOp>(loc, op.getRhs(), op.getLhs());
       op.getResult().replaceAllUsesWith(newOp.getResult());
+      op.erase();
+      return true;
     }
   }
+  return false;
 }
 
 /// b = a + cst
@@ -163,7 +168,8 @@ void swapConstOperandToRight(arith::AddIOp op) {
 /// -->
 /// b1 = a + d
 /// e = b1 + cst
-void simplifyAddConstant(arith::AddIOp op) {
+bool simplifyAddConstant(arith::AddIOp op) {
+  int cnt = 0;
   auto loc = op.getLoc();
   auto ctx = op.getContext();
   OpBuilder builder(ctx);
@@ -179,6 +185,8 @@ void simplifyAddConstant(arith::AddIOp op) {
             auto newOp_2 = builder.create<arith::AddIOp>(loc,
                 newOp_1.getResult(), parentAddOp.getRhs());
             op.getResult().replaceAllUsesWith(newOp_2.getResult());
+            op.erase();
+            cnt++;
           }
         }
       }
@@ -186,6 +194,7 @@ void simplifyAddConstant(arith::AddIOp op) {
   };
   implSimplifyConstant(op.getLhs(), op.getRhs());
   implSimplifyConstant(op.getRhs(), op.getLhs());
+  return cnt != 0;
 }
 
 bool moveUpCastIndexToI64(UnrealizedConversionCastOp castOp) {
@@ -249,16 +258,69 @@ bool moveUpCastIndexToI64(UnrealizedConversionCastOp castOp) {
   return false;
 }
 
-void runMoveUpCastIndexToI64(func::FuncOp funcOp) {
+
+int runSwapConstOperandToRight(func::FuncOp funcOp) {
+  int totalCnt = 0;
+  int cnt = 1;
+  while(cnt != 0) {
+    cnt = 0;
+    funcOp.walk([&](arith::AddIOp op) {
+      if(swapConstOperandToRight(op)) {
+        cnt++;
+        totalCnt++;
+      }
+      return WalkResult::advance();
+    });
+  }
+  return totalCnt;
+}
+
+int runSimplifyAddConstant(func::FuncOp funcOp) {
+  int totalCnt = 0;
+  int cnt = 1;
+  while(cnt != 0) {
+    cnt = 0;
+    funcOp.walk([&](arith::AddIOp op) {
+      if(simplifyAddConstant(op)) {
+        cnt++;
+        totalCnt++;
+      }
+      return WalkResult::advance();
+    });
+  }
+  return totalCnt;
+}
+
+int runSimplifyMuliOp(func::FuncOp funcOp) {
+  int totalCnt = 0;
+  int cnt = 1;
+  while(cnt != 0) {
+    cnt = 0;
+    funcOp.walk([&](arith::MulIOp muliOp) {
+      if(simplifyMuliOp(muliOp)) {
+        cnt++;
+        totalCnt++;
+      }
+      return WalkResult::advance();
+    });
+  }
+  return totalCnt;
+}
+
+int runMoveUpCastIndexToI64(func::FuncOp funcOp) {
+  int totalCnt = 0;
   int cnt = 1;
   while(cnt != 0) {
     cnt = 0;
     funcOp.walk([&](UnrealizedConversionCastOp op) {
-      if(moveUpCastIndexToI64(op))
+      if(moveUpCastIndexToI64(op)) {
         cnt++;
+        totalCnt++;
+      }
       return WalkResult::advance();
     });
   }
+  return totalCnt;
 }
 
 } // namepsace
@@ -281,26 +343,18 @@ public:
     pm.run(module);
 
     eliminateConstantCast(funcOp);
-    pm.run(module);
 
-    funcOp.walk([&](arith::MulIOp muliOp) {
-      simplifyMuliOp(muliOp);
-      return WalkResult::advance();
-    });
-    pm.run(module);
-
-    runMoveUpCastIndexToI64(funcOp);
-
-    funcOp.walk([&](arith::AddIOp op) {
-      swapConstOperandToRight(op);
-      return WalkResult::advance();
-    });
-
-    funcOp.walk([&](arith::AddIOp op) {
-      simplifyAddConstant(op);
-      return WalkResult::advance();
-    });
-    pm.run(module);
+    {
+      int cnt = 1;
+      while(cnt != 0) {
+        cnt = 0;
+        cnt += runMoveUpCastIndexToI64(funcOp);
+        cnt += runSimplifyMuliOp(funcOp);
+        cnt += runSwapConstOperandToRight(funcOp);
+        cnt += runSimplifyAddConstant(funcOp);
+        pm.run(module);
+      }
+    }
   }
 };
 } // namespace mlir

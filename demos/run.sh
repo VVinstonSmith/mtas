@@ -1,7 +1,6 @@
 
 ../build/bin/mtas-opt matmul_micro_kernel.mlir \
     -split-matmul \
-    -lower-kernel-arguments \
     -cse -canonicalize -cse \
     -tile-linalg-dims \
     -cse -canonicalize \
@@ -9,6 +8,7 @@
     -cse -canonicalize -cse \
     -lower-linalg-ops \
     -cse -canonicalize -cse \
+    -lower-kernel-arguments \
     -fold-memref-alias-ops \
     -convert-memref-to-ptr \
     -expand-strided-metadata \
@@ -18,8 +18,8 @@
     -loop-invariant-code-motion \
     -cse -canonicalize -cse \
     -cast-ptr-to-int64 \
-    -loop-folding \
     -cse -canonicalize -cse \
+    -loop-folding \
     -fold-register-alloca \
     -cse -canonicalize -cse \
     -allocate-offset-registers \
