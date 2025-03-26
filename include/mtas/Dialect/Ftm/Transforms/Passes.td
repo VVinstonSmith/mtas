@@ -189,4 +189,12 @@ def AllocateOffsetRegisters : Pass<"allocate-offset-registers", "func::FuncOp"> 
   ];
 }
 
+def LoopStrengthReduce : Pass<"loop-strength-reduce", "func::FuncOp"> {
+  let summary = "A pass to reduce loop strength";
+  let constructor = "mlir::ftm::createLoopStrengthReducePass()";
+  let dependentDialects = [
+    "ftm::FtmDialect",
+  ];
+}
+
 #endif // MTAS_DIALECT_FTM_TRANSFORMS_PASSES

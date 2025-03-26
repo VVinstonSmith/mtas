@@ -24,6 +24,7 @@
     -cse -canonicalize -cse \
     -allocate-offset-registers \
     -cse -canonicalize -cse \
+    -loop-strength-reduce \
     
     # -cse -canonicalize -cse \
 
