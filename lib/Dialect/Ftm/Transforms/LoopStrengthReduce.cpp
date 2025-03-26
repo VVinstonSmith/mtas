@@ -33,67 +33,6 @@ struct MulInfo {
   int64_t multiplier;
 };
 
-// 查找一个值开始的乘法链，找到链上最后一个乘法和累积的常量值
-bool findMulChain(Value startVal, 
-                  SmallVector<MulInfo, 4> &mulOpsToOptimize) {
-  Value currVal = startVal;
-  Value prevVal = nullptr;
-  int64_t accumulatedMultiplier = 1;
-  arith::MulIOp finalMulOp = nullptr;
-  Value finalConstOperand = nullptr;
-  
-  // 沿着乘法链向下查找
-  while (true) {
-    // 查找currVal参与的i64常量乘法
-    bool foundNextMul = false;
-    
-    for (Operation *user : currVal.getUsers()) {
-      auto mulOp = dyn_cast<arith::MulIOp>(user);
-      if (!mulOp)
-        continue;
-        
-      Value lhs = mulOp.getLhs();
-      Value rhs = mulOp.getRhs();
-      
-      // 确定哪个是当前值，哪个是常量
-      Value constOperand = nullptr;
-      if (lhs == currVal && rhs.getDefiningOp<arith::ConstantOp>()) {
-        constOperand = rhs;
-      } else if (rhs == currVal && lhs.getDefiningOp<arith::ConstantOp>()) {
-        constOperand = lhs;
-      } else {
-        continue;
-      }
-      
-      // 检查常量类型是否为i64
-      auto constDefOp = constOperand.getDefiningOp<arith::ConstantOp>();
-      auto constAttr = constDefOp.getValue().cast<IntegerAttr>();
-      if (!constAttr.getType().isInteger(64))
-        continue;
-        
-      // 找到下一个乘法操作
-      int64_t multiplier = constAttr.getInt();
-      accumulatedMultiplier *= multiplier;
-      finalMulOp = mulOp;
-      finalConstOperand = constOperand;
-      prevVal = currVal;
-      currVal = mulOp.getResult();
-      foundNextMul = true;
-      break;
-    }
-    
-    if (!foundNextMul)
-      break;
-  }
-  
-  // 如果找到了乘法链并且不是只有归纳变量本身
-  if (finalMulOp && accumulatedMultiplier != 1) {
-    mulOpsToOptimize.push_back({finalMulOp, finalConstOperand, accumulatedMultiplier});
-    return true;
-  }
-  return false;
-}
-
 void implLoopStrengthReduce(func::FuncOp funcOp) {
   // 遍历函数中所有的scf::forOp
   funcOp.walk([&](scf::ForOp forOp) {
@@ -131,9 +70,34 @@ void implLoopStrengthReduce(func::FuncOp funcOp) {
       }
     }
 
-    // 查找并处理乘法链
+    // 遍历所有归纳变量及其转换后值的使用者
     for (Value indVar : inductionVars) {
-      findMulChain(indVar, mulOpsToOptimize);
+      for (Operation *user : indVar.getUsers()) {
+        // 判断是否是arith.muli操作且另一个操作数是常量
+        if (auto mulOp = dyn_cast<arith::MulIOp>(user)) {
+          Value lhs = mulOp.getLhs();
+          Value rhs = mulOp.getRhs();
+          
+          // 确定哪个是归纳变量，哪个是常量
+          Value constOperand;
+          if (lhs == indVar && rhs.getDefiningOp<arith::ConstantOp>()) {
+            constOperand = rhs;
+          } else if (rhs == indVar && lhs.getDefiningOp<arith::ConstantOp>()) {
+            constOperand = lhs;
+          } else {
+            // 不是常量乘以归纳变量的形式，跳过
+            continue;
+          }
+        
+        // 检查常量类型是否为i64
+        auto constDefOp = constOperand.getDefiningOp<arith::ConstantOp>();
+        auto constAttr = constDefOp.getValue().cast<IntegerAttr>();
+        if (constAttr.getType().isInteger(64)) {
+          // 记录乘法信息
+          mulOpsToOptimize.push_back({mulOp, constOperand, constAttr.getInt()});
+        }
+      }
+    }
     }
 
     // 如果没有找到可优化的乘法操作，直接返回
