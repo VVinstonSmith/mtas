@@ -67,6 +67,9 @@ std::unique_ptr<Pass> createAllocateOffsetRegistersPass();
 /// Create a pass to reduce loop strength
 std::unique_ptr<Pass> createLoopStrengthReducePass();
 
+/// Create a pass to optimize address calculations in loops by directly updating base pointers
+std::unique_ptr<Pass> createAddressBaseTransformationPass();
+
 //===----------------------------------------------------------------------===//
 // Registration
 //===----------------------------------------------------------------------===//

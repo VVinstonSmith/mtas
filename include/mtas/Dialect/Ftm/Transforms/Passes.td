@@ -197,4 +197,12 @@ def LoopStrengthReduce : Pass<"loop-strength-reduce", "func::FuncOp"> {
   ];
 }
 
+def AddressBaseTransformation : Pass<"address-base-transformation", "func::FuncOp"> {
+  let summary = "A pass to optimize address calculations in loops by directly updating base pointers";
+  let constructor = "mlir::ftm::createAddressBaseTransformationPass()";
+  let dependentDialects = [
+    "ftm::FtmDialect",
+  ];
+}
+
 #endif // MTAS_DIALECT_FTM_TRANSFORMS_PASSES

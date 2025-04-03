@@ -11,6 +11,7 @@ add_mlir_dialect_library(MLIRFtmTransforms
     FoldRegisterAlloca.cpp
     AllocateOffsetRegisters.cpp
     LoopStrengthReduce.cpp
+    AddressBaseTransformation.cpp
 
     ADDITIONAL_HEADER_DIRS
     ${MTAS_SOURCE_DIR}/include/mtas/Dialect/Ftm
