@@ -64,24 +64,30 @@ ftm::SmoviOp scanOffsetRegisterInitializerWith(
 
 ftm::Cache analyzeTipConstantAddOp(arith::AddIOp addiOp) {
   ftm::Cache memLevel = ftm::Cache::Unknown;
+  // 条件1：右操作数必须是常量整数
   if(auto defOp = addiOp.getRhs().getDefiningOp()) {
     if(!isa<arith::ConstantIntOp>(defOp))
       return ftm::Cache::Unknown;
   } else
     return ftm::Cache::Unknown;
   for(auto userOp : addiOp.getResult().getUsers()) {
+    // 条件2: 加法结果必须被用于 ftm.CastOp 类型转换
     if(!isa<ftm::CastOp>(userOp))
       return ftm::Cache::Unknown;
     auto castOp = cast<ftm::CastOp>(userOp);
+    // 条件3: 转换结果必须是 LLVM 指针类型
     if(!castOp.getType().isa<LLVM::LLVMPointerType>())
       return ftm::Cache::Unknown;
+    // 条件4: 指针必须用于 load 或 store 操作
     for(auto ptrUserOp : castOp.getResult().getUsers()) {
       if(!isa<ftm::LoadOp>(ptrUserOp) && !isa<ftm::StoreOp>(ptrUserOp))
         continue;
+      // 检查内存级别属性
       if(!ptrUserOp->getAttr(ftm::MemLevelAttr::name)) {
         llvm::errs() << "there is a ftm.load without memory level\n";
         return ftm::Cache::Unknown;
       }
+      // 获取并验证内存级别一致性
       auto loadOpMemLevel = ptrUserOp->getAttr(
           ftm::MemLevelAttr::name).cast<ftm::MemLevelAttr>().getLevel();
       if(memLevel != ftm::Cache::Unknown && memLevel != loadOpMemLevel) {
@@ -107,7 +113,7 @@ bool implOffsetRegisterAllocating(arith::AddIOp addiOp, ftm::Cache memLevel,
   auto funcOp = addiOp->getParentOfType<func::FuncOp>();
   auto constOp = cast<arith::ConstantIntOp>(addiOp.getRhs().getDefiningOp());
   int64_t constInt = constOp.getValue().cast<IntegerAttr>().getInt();
-  int64_t imm = constInt / 2;
+  int64_t imm = constInt / 8; // 以字为单位
   
   ftm::SmoviOp smovi = scanOffsetRegisterInitializerWith(funcOp, memLevel, imm);
   if(!smovi) {
