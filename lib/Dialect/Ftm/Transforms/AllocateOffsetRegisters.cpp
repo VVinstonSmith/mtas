@@ -36,9 +36,15 @@ int64_t vectorOffsetEndId = 8;
 int64_t scalarOffsetStartId = 8;
 int64_t scalarOffsetEndId = 16;
 
-ftm::SmoviOp scanOffsetRegisterInitializerWith(
+// 可能需要返回一个结构体，包含SmoviOp和对应的DeclareRegisterOp
+struct RegisterInfo {
+  ftm::SmoviOp smoviOp;
+  ftm::DeclareRegisterOp declareOp;
+};
+
+RegisterInfo scanOffsetRegisterInitializerWith(
     func::FuncOp funcOp, ftm::Cache memLevel, unsigned value) {
-  ftm::SmoviOp targetOp;
+  RegisterInfo result;
   funcOp.walk([&](ftm::SmoviOp smoviOp) {
     if(auto defOp = smoviOp.getReg().getDefiningOp()) {
       if(auto declareOp = dyn_cast<ftm::DeclareRegisterOp>(defOp)) {
@@ -52,14 +58,15 @@ ftm::SmoviOp scanOffsetRegisterInitializerWith(
               registerId >= vectorOffsetStartId && registerId < vectorOffsetEndId) ||
            (memLevel == ftm::Cache::SM && 
               registerId >= scalarOffsetStartId && registerId < scalarOffsetEndId)) {
-          targetOp = smoviOp;
+          result.smoviOp = smoviOp;
+          result.declareOp = declareOp;
           return WalkResult::interrupt();
         }
       }
     }
     return WalkResult::advance();
   });
-  return targetOp;
+  return result;
 }
 
 ftm::Cache analyzeTipConstantAddOp(arith::AddIOp addiOp) {
@@ -115,11 +122,13 @@ bool implOffsetRegisterAllocating(arith::AddIOp addiOp, ftm::Cache memLevel,
   int64_t constInt = constOp.getValue().cast<IntegerAttr>().getInt();
   int64_t imm = constInt / 8; // 以字为单位
   
-  ftm::SmoviOp smovi = scanOffsetRegisterInitializerWith(funcOp, memLevel, imm);
-  if(!smovi) {
+  RegisterInfo regInfo = scanOffsetRegisterInitializerWith(funcOp, memLevel, imm);
+  ftm::DeclareRegisterOp declareOR;
+  
+  if(!regInfo.smoviOp) {
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPointToStart(&funcOp.getBody().front());
-    auto declareOR = builder.create<ftm::DeclareRegisterOp>(loc, builder.getI64Type());
+    declareOR = builder.create<ftm::DeclareRegisterOp>(loc, builder.getI64Type());
     declareOR->setAttr(ftm::MemLevelAttr::name,
         ftm::MemLevelAttr::get(ctx, ftm::Cache::OffsetRegister));
     if(memLevel == ftm::Cache::SM) {
@@ -129,8 +138,10 @@ bool implOffsetRegisterAllocating(arith::AddIOp addiOp, ftm::Cache memLevel,
       declareOR->setAttr(ftm::RegisterIdAttr::name, 
         ftm::RegisterIdAttr::get(ctx, vectorOffsetRegisterIdx++));
     }
-    smovi = builder.create<ftm::SmoviOp>(loc,
-        builder.getI64Type(), builder.getI64IntegerAttr(imm), declareOR);
+    builder.create<ftm::SmoviOp>(loc,
+        builder.getI64IntegerAttr(imm), declareOR);
+  } else {
+    declareOR = regInfo.declareOp;
   }
 
   for(auto userOp : addiOp.getResult().getUsers()) {
@@ -145,13 +156,13 @@ bool implOffsetRegisterAllocating(arith::AddIOp addiOp, ftm::Cache memLevel,
       builder.setInsertionPointAfter(ptrUserOp);
       if(auto loadOp = dyn_cast<ftm::LoadOp>(ptrUserOp)) {
         auto newLoadOp = builder.create<ftm::LoadOp>(loc,
-            loadOp.getType(), newCastOp, smovi.getResult());
+            loadOp.getType(), newCastOp, declareOR.getResult());
         newLoadOp->setAttrs(loadOp->getAttrs());
         loadOp.getResult().replaceAllUsesWith(newLoadOp.getResult());
         loadOp.erase();
       } else if(auto storeOp = dyn_cast<ftm::StoreOp>(ptrUserOp)) {
         auto newStoreOp = builder.create<ftm::StoreOp>(loc,
-            storeOp.getValue(), newCastOp, smovi.getResult());
+            storeOp.getValue(), newCastOp, declareOR.getResult());
         newStoreOp->setAttrs(storeOp->getAttrs());
         storeOp.erase();
       }

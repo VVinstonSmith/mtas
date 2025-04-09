@@ -224,11 +224,11 @@ bool implAddOpLowering(Operation *op) {
   declareOp->setAttr(ftm::RegisterIdAttr::name, RegisterIdAttr::get(ctx, registerId)); 
   
   Operation* moviOp = (registerLevel == ftm::Cache::VectorRegister) ?
-      builder.create<ftm::MoviOp>(loc, decOutputType,
+      builder.create<ftm::VmoviOp>(loc, 
           builder.getI64IntegerAttr(0x3F8000003F800000), declareOp) :
-      builder.create<ftm::SmoviOp>(loc, decOutputType,
+      builder.create<ftm::SmoviOp>(loc, 
           builder.getI64IntegerAttr(0x3F8000003F800000), declareOp);    
-  Value cstOneOperand = moviOp->getResult(0);
+  Value cstOneOperand = declareOp->getResult(0);
   
   builder.setInsertionPoint(addOp);
   auto fmaOp = builder.create<ftm::FMAOp>(loc,
@@ -289,10 +289,9 @@ bool implFillOpLowering(Operation *op) {
   Type elem1024BitTy = VectorType::get({32}, builder.getF32Type());
 
   ftm::MemRefLoadOp loadOp;
-  Operation* moviOp;
   if(memLevel == ftm::Cache::AM || memLevel == ftm::Cache::VectorRegister) {
     loadOp = builder.create<ftm::MemRefLoadOp>(loc, elem1024BitTy, subview);
-    moviOp =  builder.create<ftm::MoviOp>(loc, elem1024BitTy,
+    builder.create<ftm::VmoviOp>(loc,
         builder.getI64IntegerAttr(constSrc.constI64), loadOp.getResult());
   } else { // SM or ScalarRegister
     auto evenSubview = getOffsetSubviewFrom(
@@ -300,13 +299,13 @@ bool implFillOpLowering(Operation *op) {
     subview.replaceAllUsesWith(evenSubview.getOperation());
     subview = evenSubview;
     loadOp = builder.create<ftm::MemRefLoadOp>(loc, elem64BitTy, subview);
-    moviOp =  builder.create<ftm::SmoviOp>(loc, elem1024BitTy,
+    builder.create<ftm::SmoviOp>(loc,
         builder.getI64IntegerAttr(constSrc.constI64), loadOp.getResult());
   }
   loadOp->setAttr(ftm::MemLevelAttr::name, MemLevelAttr::get(ctx, memLevel));
 
   builder.setInsertionPoint(fillOp);
-  auto storeValue = builder.create<ftm::MemRefStoreOp>(loc, moviOp->getResult(0), subview);
+  auto storeValue = builder.create<ftm::MemRefStoreOp>(loc, loadOp.getResult(), subview);
   storeValue->setAttr(ftm::MemLevelAttr::name, MemLevelAttr::get(ctx, memLevel));
 
   fillOp.erase();

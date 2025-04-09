@@ -197,11 +197,10 @@ def Ftm_DeclareRegisterOp: Ftm_Op<"declare_register">,
 }
 
 def Ftm_SmoviOp :
-  Op<Ftm_Dialect, "smovi", [Pure]>,
-    Arguments<(ins I64Attr:$imm, I64:$reg)>,
-    Results<(outs I64:$result)> {
+  Op<Ftm_Dialect, "smovi", [AllTypesMatch<["reg"]>]>,
+    Arguments<(ins I64Attr:$imm, I64:$reg)> {
   let summary = "scalar move immediate number";
-  let assemblyFormat = "$imm `,` $reg attr-dict `:` type($result)";
+  let assemblyFormat = "$imm `,` $reg attr-dict `:` type($reg)";
 }
 
 def Ftm_MoviOp :
