@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "llvm/ADT/SmallSet.h"
 
 #include <iostream>
 using namespace std;
@@ -33,91 +34,96 @@ void implAddressBaseTransformation(func::FuncOp funcOp) {
         if (forOp.getInitArgs().empty())
             return;
 
-        // 存储映射关系：offset迭代参数 -> (base值, increment值)
-        DenseMap<Value, std::pair<Value, Value>> offsetToBaseMap;
-        // 记录需要移除的加法操作
-        SmallVector<Operation*, 4> addOpsToRemove;
-        // 记录offset在迭代参数中的索引
-        DenseMap<Value, unsigned> offsetToIndexMap;
+        // offset迭代参数 -> base + offset
+        DenseMap<Value, arith::AddIOp> offsetToBaseAddMap;
+        // offset迭代参数 -> cast
+        DenseMap<Value, ftm::CastOp> offsetToCastMap;
+        // offset迭代参数 -> offset + increment
+        DenseMap<Value, arith::AddIOp> offsetToOffsetAddMap;
+        llvm::SmallSet<Operation*, 8> opsToRemove;
 
         // 遍历迭代参数，判断是否被两个加法使用
-        // 其中一个加法的另一个参数是变量，也就是base值，将该加法加入到addOpsToRemove
-        // 另一个加法是常量加法，也就是increment值
         for (unsigned i = 0; i < forOp.getRegionIterArgs().size(); ++i) {
             Value iterArg = forOp.getRegionIterArgs()[i];
-            Value baseValue = nullptr;
-            Value incrementValue = nullptr;
-            Operation* addrAddOp = nullptr;
+            arith::AddIOp baseAddOp = nullptr;
+            arith::AddIOp offsetAddOp = nullptr;
+            ftm::CastOp castOp = nullptr;
             
             // 遍历使用该迭代参数的操作
             for (Operation* user : iterArg.getUsers()) {
-                // 检查是否是加法操作
                 if (auto addOp = dyn_cast<arith::AddIOp>(user)) {
                     Value lhs = addOp.getLhs();
                     Value rhs = addOp.getRhs();
-                    
-                    // 检查是否是 base + offset 形式
-                    if (lhs == iterArg && !rhs.getDefiningOp<arith::ConstantOp>()) {
-                        baseValue = rhs;
-                        addrAddOp = addOp;
-                    } else if (rhs == iterArg && !lhs.getDefiningOp<arith::ConstantOp>()) {
-                        baseValue = lhs;
-                        addrAddOp = addOp;
+                    bool containsIterArg = (lhs == iterArg || rhs == iterArg);
+                    Value otherOperand = (lhs == iterArg) ? rhs : lhs;
+
+                    // Check for base + offset pattern
+                    if (containsIterArg && !otherOperand.getDefiningOp<arith::ConstantOp>() &&
+                        addOp.getResult().hasOneUse() &&
+                        (castOp = dyn_cast<ftm::CastOp>(*addOp.getResult().user_begin())) &&
+                        castOp.getType().isa<LLVM::LLVMPointerType>()) {
+                        baseAddOp = addOp;
                     }
-                    
-                    // 检查是否是 offset + increment 形式
+
+                    // Check for offset + increment pattern
                     auto yieldOp = cast<scf::YieldOp>(forOp.getBody()->getTerminator());
-                    if (addOp.getResult() == yieldOp.getOperands()[i]) {
-                        if (lhs == iterArg && rhs.getDefiningOp<arith::ConstantOp>()) {
-                            incrementValue = rhs;
-                        } else if (rhs == iterArg && lhs.getDefiningOp<arith::ConstantOp>()) {
-                            incrementValue = lhs;
-                        }
+                    if (containsIterArg && otherOperand.getDefiningOp<arith::ConstantOp>() &&
+                        addOp.getResult() == yieldOp.getOperands()[i]) {
+                        offsetAddOp = addOp;
                     }
                 }
             }
             
             // 如果找到了完整的模式，记录下来
-            if (baseValue && incrementValue && addrAddOp) {
-                offsetToBaseMap[iterArg] = {baseValue, incrementValue};
-                offsetToIndexMap[iterArg] = i;
-                addOpsToRemove.push_back(addrAddOp);
+            if (baseAddOp && castOp && offsetAddOp) {
+                offsetToBaseAddMap[iterArg] = baseAddOp;
+                offsetToCastMap[iterArg] = castOp;
+                offsetToOffsetAddMap[iterArg] = offsetAddOp;
+                // 移除base + offset和cast
+                opsToRemove.insert(baseAddOp);
+                opsToRemove.insert(castOp);
             }
         }
 
         // 如果没有找到可优化的模式，直接返回
-        if (offsetToBaseMap.empty())
+        if (offsetToBaseAddMap.empty())
             return;
             
         OpBuilder builder(forOp);
+        builder.setInsertionPoint(forOp);
 
         // 准备新的初始值
-        // 传入的初始化参数需要首先进行一次base = base + offset，如果offset初始为常量0则跳过该加法
+        // 传入的初始化参数需要首先进行一次basePtr = basePtr + offset，如果offset初始为常量0则跳过该加法
         SmallVector<Value, 4> newInitArgs;
         for (unsigned i = 0; i < forOp.getInitArgs().size(); ++i) {
             Value initArg = forOp.getInitArgs()[i];
             Value iterArg = forOp.getRegionIterArgs()[i];
             
-            if (offsetToBaseMap.count(iterArg)) {
-                // 这是一个offset参数，需要替换为base
-                Value base = offsetToBaseMap[iterArg].first;
+            if (offsetToBaseAddMap.count(iterArg)) {
+                auto baseAdd = offsetToBaseAddMap[iterArg];
+                Value base = offsetToBaseAddMap.contains(baseAdd.getLhs()) ? 
+                    baseAdd.getRhs() : baseAdd.getLhs();
+                // 将base转换为!llvm.ptr类型
+                Value basePtr = builder.create<ftm::CastOp>(forOp.getLoc(), 
+                    LLVM::LLVMPointerType::get(builder.getContext()), 
+                    base);
                 
                 // 检查初始offset是否为0
                 if (auto constOp = initArg.getDefiningOp<arith::ConstantOp>()) {
                     auto constAttr = constOp.getValue().cast<IntegerAttr>();
                     if (constAttr.getInt() == 0) {
-                        // offset初始为0，直接使用base
-                        newInitArgs.push_back(base);
+                        // offset初始为0，直接使用basePtr
+                        newInitArgs.push_back(basePtr);
                     } else {
-                        // offset初始不为0，需要base = base + offset
-                        auto baseWithOffset = builder.create<arith::AddIOp>(
-                            forOp.getLoc(), base, initArg);
+                        // offset初始不为0，需要basePtr = basePtr + offset
+                        auto baseWithOffset = builder.create<ftm::AddaOp>(
+                            forOp.getLoc(), basePtr, initArg);
                         newInitArgs.push_back(baseWithOffset);
                     }
                 } else {
-                    // offset初始不是常量，需要base = base + offset
-                    auto baseWithOffset = builder.create<arith::AddIOp>(
-                        forOp.getLoc(), base, initArg);
+                    // offset初始不是常量，需要base = basePtr + offset
+                    auto baseWithOffset = builder.create<ftm::AddaOp>(
+                        forOp.getLoc(), basePtr, initArg);
                     newInitArgs.push_back(baseWithOffset);
                 }
             } else {
@@ -141,25 +147,38 @@ void implAddressBaseTransformation(func::FuncOp funcOp) {
                 // 映射迭代参数
                 for (unsigned i = 0; i < forOp.getRegionIterArgs().size(); ++i) {
                     Value oldArg = forOp.getRegionIterArgs()[i];
-                    mapper.map(oldArg, iterArgs[i]);
+                    Value newArg = iterArgs[i];
+                    mapper.map(oldArg, newArg);
                     
-                    // 如果是offset参数，还需要映射对应的地址计算结果
-                    if (offsetToBaseMap.count(oldArg)) {
-                        // 找到对应的地址计算操作
-                        for (Operation* user : oldArg.getUsers()) {
-                            if (std::find(addOpsToRemove.begin(), addOpsToRemove.end(), user) != addOpsToRemove.end()) {
-                                // 将地址计算结果映射为基址参数
-                                mapper.map(user->getResult(0), iterArgs[i]);
-                            }
-                        }
+                    // 如果是offset参数，映射cast后的指针到迭代参数
+                    if (offsetToCastMap.count(oldArg)) {
+                        auto ptrValue = offsetToCastMap[oldArg].getResult();
+                        mapper.map(ptrValue, newArg);
                     }
                 }
                 
-                // 克隆循环体中的操作，排除需要移除的加法操作
+                // 克隆循环体中的操作
                 for (auto &op : forOp.getRegion().front()) {
-                    // 跳过要移除的加法操作
-                    if (std::find(addOpsToRemove.begin(), addOpsToRemove.end(), &op) != addOpsToRemove.end()) {
+                    // 跳过要移除的操作
+                    if (opsToRemove.contains(&op)){
                         continue;
+                    }
+
+                    // 如果是加法操作，检查是否是offset + increment形式
+                    if(auto addOp = dyn_cast<arith::AddIOp>(op)){
+                        ftm::AddaOp basePtrAddOp = nullptr;
+                        for (auto &entry : offsetToOffsetAddMap) {
+                            if (entry.second == addOp) {
+                                // 使用Adda替换Addi
+                                basePtrAddOp = nestedBuilder.create<ftm::AddaOp>(op.getLoc(), 
+                                    mapper.lookup(entry.first), 
+                                    entry.second.getRhs());
+                                mapper.map(entry.second.getResult(), basePtrAddOp.getResult());
+                                break;
+                            }
+                        }
+                        if(basePtrAddOp)
+                            continue;
                     }
                     
                     nestedBuilder.clone(op, mapper);

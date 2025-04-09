@@ -197,30 +197,47 @@ def Ftm_DeclareRegisterOp: Ftm_Op<"declare_register">,
 }
 
 def Ftm_SmoviOp :
-  Op<Ftm_Dialect, "smovi", [AllTypesMatch<["reg"]>]>,
+  Op<Ftm_Dialect, "smovi">,
     Arguments<(ins I64Attr:$imm, I64:$reg)> {
   let summary = "scalar move immediate number";
   let assemblyFormat = "$imm `,` $reg attr-dict `:` type($reg)";
 }
 
-def Ftm_MoviOp :
-  Op<Ftm_Dialect, "movi", [Pure, AllTypesMatch<["reg", "result"]>]>,
-    Arguments<(ins I64Attr:$imm, VectorOfAnyRankOf<[AnyFloat]>:$reg)>,
-    Results<(outs VectorOfAnyRankOf<[AnyFloat]>:$result)> {
-  let summary = "vector move immediate number";
-  let assemblyFormat = "$imm `,` $reg attr-dict `:` type($result)";
-  let extraClassDeclaration = [{
-    VectorType getVectorType() { return ::llvm::cast<VectorType>(getReg().getType()); }
-  }];
-}
+// def Ftm_MoviOp :
+//   Op<Ftm_Dialect, "movi", [Pure, AllTypesMatch<["reg", "result"]>]>,
+//     Arguments<(ins I64Attr:$imm, VectorOfAnyRankOf<[AnyFloat]>:$reg)>,
+//     Results<(outs VectorOfAnyRankOf<[AnyFloat]>:$result)> {
+//   let summary = "vector move immediate number";
+//   let assemblyFormat = "$imm `,` $reg attr-dict `:` type($result)";
+//   let extraClassDeclaration = [{
+//     VectorType getVectorType() { return ::llvm::cast<VectorType>(getReg().getType()); }
+//   }];
+// }
 
 def Ftm_VmoviOp :
-  Op<Ftm_Dialect, "vmovi", [AllTypesMatch<["reg"]>]>,
+  Op<Ftm_Dialect, "vmovi">,
     Arguments<(ins I64Attr:$imm, VectorOfAnyRankOf<[AnyFloat]>:$reg)> {
   let summary = "vector move immediate number";
   let assemblyFormat = "$imm `,` $reg attr-dict `:` type($reg)";
   let extraClassDeclaration = [{
     VectorType getVectorType() { return ::llvm::cast<VectorType>(getReg().getType()); }
+  }];
+}
+
+def Ftm_AddaOp :
+  Op<Ftm_Dialect, "adda", [AllTypesMatch<["lhs", "result"]>]>,
+    Arguments<(ins LLVM_AnyPointer:$lhs,
+                   I64:$rhs)>,
+    Results<(outs LLVM_AnyPointer:$result)> {
+  let summary = "address addition operation";
+  let assemblyFormat = "$lhs `,` $rhs attr-dict `:` type($result)";
+  let builders = [
+    OpBuilder<(ins "Value":$lhs, "Value":$rhs), [{
+      build($_builder, $_state, lhs.getType(), lhs, rhs);
+    }]>
+  ];
+  let extraClassDeclaration = [{
+    LLVM::LLVMPointerType getPointerType() { return ::llvm::cast<LLVM::LLVMPointerType>(getLhs().getType()); }
   }];
 }
 

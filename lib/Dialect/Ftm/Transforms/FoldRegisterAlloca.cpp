@@ -195,9 +195,10 @@ bool replaceLoadAndStoreWithRegister(Operation* op) {
     if(auto fma = dyn_cast<ftm::FMAOp>(defOp)) {
       builder.create<ftm::VFMAOp>(loc,
           fma.getLhs(), fma.getRhs(), fma.getAcc(), regDecVal);
-    } else if(auto movi = dyn_cast<ftm::MoviOp>(defOp)) {
-      builder.create<ftm::VmoviOp>(loc, movi.getImm(), movi.getReg());
     }
+    //  else if(auto movi = dyn_cast<ftm::MoviOp>(defOp)) {
+    //   builder.create<ftm::VmoviOp>(loc, movi.getImm(), movi.getReg());
+    // }
     storeOp.erase();
   }
   return true;
