@@ -205,4 +205,13 @@ def AddressBaseTransformation : Pass<"address-base-transformation", "func::FuncO
   ];
 }
 
+def EliminateIdentityCasts : Pass<"eliminate-identity-casts", "func::FuncOp"> {
+  let summary = "A pass to eliminate identity cast operations (ptr->i64->ptr)";
+  let constructor = "mlir::ftm::createEliminateIdentityCastsPass()";
+  let dependentDialects = [
+    "ftm::FtmDialect",
+    "LLVM::LLVMDialect",
+  ];
+}
+
 #endif // MTAS_DIALECT_FTM_TRANSFORMS_PASSES

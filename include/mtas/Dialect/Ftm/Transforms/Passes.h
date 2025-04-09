@@ -70,6 +70,9 @@ std::unique_ptr<Pass> createLoopStrengthReducePass();
 /// Create a pass to optimize address calculations in loops by directly updating base pointers
 std::unique_ptr<Pass> createAddressBaseTransformationPass();
 
+/// Create a pass to eliminate identity cast operations (ptr->i64->ptr)
+std::unique_ptr<Pass> createEliminateIdentityCastsPass();
+
 //===----------------------------------------------------------------------===//
 // Registration
 //===----------------------------------------------------------------------===//
