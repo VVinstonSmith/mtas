@@ -232,7 +232,7 @@ bool implAddOpLowering(Operation *op) {
   
   builder.setInsertionPoint(addOp);
   auto fmaOp = builder.create<ftm::FMAOp>(loc,
-      decOutputType, addOpOperands[0], cstOneOperand, addOpOperands[1]);
+      decOutputType, addOpOperands[1], cstOneOperand, addOpOperands[0]);
 
   auto storeValue = builder.create<ftm::MemRefStoreOp>(loc, 
       fmaOp.getResult(), subviews[2]);

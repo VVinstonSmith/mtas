@@ -225,7 +225,7 @@ def Ftm_VmoviOp :
 }
 
 def Ftm_AddaOp :
-  Op<Ftm_Dialect, "adda", [AllTypesMatch<["lhs", "result"]>]>,
+  Op<Ftm_Dialect, "adda", [AllTypesMatch<["lhs", "result"]>, Pure]>,
     Arguments<(ins LLVM_AnyPointer:$lhs,
                    I64:$rhs)>,
     Results<(outs LLVM_AnyPointer:$result)> {
