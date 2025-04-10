@@ -15,6 +15,7 @@
 #define MTAS_INITALLDIALECTS_H
 
 #include "mtas/Dialect/Ftm/IR/Ftm.h"
+#include "mtas/Dialect/Mt/IR/Mt.h"
 
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/IR/MLIRContext.h"
@@ -25,6 +26,7 @@ namespace mtas {
 inline void registerAllDialects(mlir::DialectRegistry &registry) {
   // clang-format off
   registry.insert<mlir::ftm::FtmDialect>();
+  registry.insert<mlir::mt::MtDialect>();
   // clang-format on
 }
 

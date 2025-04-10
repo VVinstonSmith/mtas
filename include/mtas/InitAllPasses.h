@@ -16,6 +16,7 @@
 
 #include "mtas/Conversion/Passes.h"
 #include "mtas/Dialect/Ftm/Transforms/Passes.h"
+#include "mtas/Dialect/Mt/Transforms/Passes.h"
 
 namespace mtas {
 
@@ -26,6 +27,7 @@ inline void registerAllPasses() {
   mtas::registerConversionPasses();
   // Dialect passes
   mlir::ftm::registerFtmPasses();
+  mlir::mt::registerMtPasses();
 }
 
 } // namespace mtas
