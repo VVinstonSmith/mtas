@@ -34,6 +34,12 @@ namespace mt {
 /// Create a pass to allocate address registers for pointer arguments in loops
 std::unique_ptr<Pass> createAllocateAddressRegistersPass();
 
+/// Create a pass to convert SCF ForOp index type to i64 type
+std::unique_ptr<Pass> createConvertForOpIndexToI64Pass();
+
+/// Create a pass to allocate scalar registers for constants
+std::unique_ptr<Pass> createAllocateScalarRegistersForConstantsPass();
+
 //===----------------------------------------------------------------------===//
 // Registration
 //===----------------------------------------------------------------------===//

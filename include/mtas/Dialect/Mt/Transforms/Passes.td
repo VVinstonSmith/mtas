@@ -19,4 +19,21 @@ def AllocateAddressRegisters : Pass<"allocate-address-registers", "func::FuncOp"
   ];
 }
 
+def ConvertForOpIndexToI64 : Pass<"convert-for-index-to-i64", "func::FuncOp"> {
+  let summary = "A pass to convert SCF ForOp index type to i64 type";
+  let constructor = "mlir::mt::createConvertForOpIndexToI64Pass()";
+  let dependentDialects = [
+    "scf::SCFDialect",
+    "arith::ArithDialect"
+  ];
+}
+
+def AllocateScalarRegistersForConstants : Pass<"allocate-scalar-registers-for-constants", "func::FuncOp"> {
+  let summary = "A pass to allocate scalar registers for constants";
+  let constructor = "mlir::mt::createAllocateScalarRegistersForConstantsPass()";
+  let dependentDialects = [
+    "mt::MtDialect",
+  ];
+}
+
 #endif // MTAS_DIALECT_MT_TRANSFORMS_PASSES

@@ -31,6 +31,13 @@ def Mt_SmvagaOp :
   let assemblyFormat = "$src `,` $dst attr-dict `:` type($dst)";
 }
 
+def Mt_SmoviOp :
+  Op<Mt_Dialect, "SMOVI">,
+  Arguments<(ins I64Attr:$imm, I64:$reg)>{
+  let summary = "scalar move immediate operation";
+  let assemblyFormat = "$imm `,` $reg attr-dict `:` type($reg)";
+}
+
 def Mt_SmovOp :
   Op<Mt_Dialect, "SMOV", [AllTypesMatch<["src", "dst"]>]>,
   Arguments<(ins I64:$src, 
