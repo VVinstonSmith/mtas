@@ -269,3 +269,157 @@ void VstwOp::print(OpAsmPrinter &p) {
   // 打印类型信息
   p << " : " << getSrc().getType() << ", " << getBase().getType();
 }
+
+//===----------------------------------------------------------------------===//
+// Mt_LabelOp
+//===----------------------------------------------------------------------===//
+
+ParseResult LabelOp::parse(OpAsmParser &parser, OperationState &result) {
+  StringAttr nameAttr;
+  
+  // 解析标签名称属性
+  if (parser.parseAttribute(nameAttr, "name", result.attributes))
+    return failure();
+  
+  // 不添加类型到结果状态，因为该操作没有返回值
+  result.addTypes({});
+  
+  return success();
+}
+
+void LabelOp::print(OpAsmPrinter &p) {
+  // 打印操作名和标签名称
+  p << " " << getName();
+}
+
+//===----------------------------------------------------------------------===//
+// Mt_SbrLabelOp
+//===----------------------------------------------------------------------===//
+
+ParseResult SbrLabelOp::parse(OpAsmParser &parser, OperationState &result) {
+  StringAttr labelAttr;
+  OpAsmParser::UnresolvedOperand condInfo;
+  Type condType;
+  bool hasCondition = false;
+  
+  // 尝试解析条件操作数
+  auto optRes = parser.parseOptionalOperand(condInfo);
+  if (optRes.has_value() && succeeded(*optRes)) {
+    hasCondition = true;
+    
+    // 解析逗号
+    if (parser.parseComma())
+      return failure();
+    
+    // 解析标签属性
+    if (parser.parseAttribute(labelAttr, "label", result.attributes))
+      return failure();
+    
+    // 解析冒号和条件类型
+    if (parser.parseColon() ||
+        parser.parseType(condType))
+      return failure();
+    
+    // 验证条件类型是否为I64
+    if (!condType.isInteger(64))
+      return parser.emitError(parser.getNameLoc(), "expected i64 for condition");
+    
+    // 添加条件操作数到结果状态
+    if (parser.resolveOperand(condInfo, condType, result.operands))
+      return failure();
+  } else {
+    // 没有条件，直接解析标签属性
+    if (parser.parseAttribute(labelAttr, "label", result.attributes))
+      return failure();
+  }
+  
+  // 不添加类型到结果状态，因为该操作没有返回值
+  result.addTypes({});
+  
+  return success();
+}
+
+void SbrLabelOp::print(OpAsmPrinter &p) {
+  // 如果有条件，先打印条件
+  if (hasCondition()) {
+    p << " " << getCond() << ", ";
+    p << getLabel() << " : " << getCond().getType();
+  } else {
+    // 没有条件，只打印标签
+    p << " " << getLabel();
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Mt_SbrRegOp
+//===----------------------------------------------------------------------===//
+
+ParseResult SbrRegOp::parse(OpAsmParser &parser, OperationState &result) {
+  OpAsmParser::UnresolvedOperand targetInfo;
+  OpAsmParser::UnresolvedOperand condInfo;
+  Type targetType;
+  Type condType;
+  bool hasCondition = false;
+  
+  // 解析目标寄存器操作数
+  if (parser.parseOperand(targetInfo))
+    return failure();
+  
+  // 检查是否有条件操作数
+  if (succeeded(parser.parseOptionalComma())) {
+    hasCondition = true;
+    
+    // 解析条件操作数
+    if (parser.parseOperand(condInfo))
+      return failure();
+  }
+  
+  // 解析冒号和类型信息
+  if (parser.parseColon() || 
+      parser.parseType(targetType))
+    return failure();
+  
+  // 验证目标寄存器类型是否为I64
+  if (!targetType.isInteger(64))
+    return parser.emitError(parser.getNameLoc(), "expected i64 for target register");
+  
+  // 添加目标寄存器操作数到结果状态
+  if (parser.resolveOperand(targetInfo, targetType, result.operands))
+    return failure();
+  
+  // 如果有条件，解析条件类型并添加条件操作数
+  if (hasCondition) {
+    if (parser.parseComma() || 
+        parser.parseType(condType))
+      return failure();
+    
+    // 验证条件类型是否为I64
+    if (!condType.isInteger(64))
+      return parser.emitError(parser.getNameLoc(), "expected i64 for condition");
+    
+    // 添加条件操作数到结果状态
+    if (parser.resolveOperand(condInfo, condType, result.operands))
+      return failure();
+  }
+  
+  // 不添加类型到结果状态，因为该操作没有返回值
+  result.addTypes({});
+  
+  return success();
+}
+
+void SbrRegOp::print(OpAsmPrinter &p) {
+  // 打印操作名和目标寄存器
+  p << " " << getTarget();
+  
+  // 如果有条件，则打印条件
+  if (hasCondition())
+    p << ", " << getCond();
+  
+  // 打印类型信息
+  p << " : " << getTarget().getType();
+  
+  // 如果有条件，则打印条件类型
+  if (hasCondition())
+    p << ", " << getCond().getType();
+}

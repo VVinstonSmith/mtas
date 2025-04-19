@@ -142,4 +142,79 @@ def Mt_AddaOp :
   }];
 }
 
+def Mt_SaddOp :
+  Op<Mt_Dialect, "SADD", [AllTypesMatch<["lhs", "rhs", "res"]>]>,
+  Arguments<(ins I64:$lhs,
+                 I64:$rhs,
+                 I64:$res)>{
+  let summary = "scalar addition operation";
+  let assemblyFormat = "$lhs `,` $rhs `,` $res attr-dict `:` type($res)";
+}
+
+def Mt_SltOp :
+  Op<Mt_Dialect, "SLT", [AllTypesMatch<["lhs", "rhs", "res"]>]>,
+  Arguments<(ins I64:$lhs,
+                 I64:$rhs,
+                 I64:$res)>{
+  let summary = "scalar less than operation";
+  let assemblyFormat = "$lhs `,` $rhs `,` $res attr-dict `:` type($res)";
+}
+
+def Mt_LabelOp :
+  Mt_Op<"LABEL">,
+  Arguments<(ins StrAttr:$name)> {
+  let summary = "Label operation for control flow";
+  let description = [{
+    This operation defines a label that can be used as a target for branching operations.
+    It is primarily used for implementing control flow structures like loops.
+    
+    Example:
+      mt.LABEL "loop_start"
+  }];
+  // let assemblyFormat = "$name attr-dict";
+  let hasCustomAssemblyFormat = 1;
+}
+
+def Mt_SbrLabelOp :
+  Mt_Op<"SBR_label">,
+  Arguments<(ins StrAttr:$label, Optional<I64>:$cond)> {
+  let summary = "Scalar branch to label operation";
+  let description = [{
+    This operation implements a branch to a label.
+    It has 6 branch delay slots. The branch target is specified by a label.
+    Optionally controlled by a condition register (R0-R6).
+    
+    Example:
+      mt.sbr_label "loop_start" : () -> ()       // Unconditional branch
+      mt.sbr_label "loop_start", %cond : i64     // Conditional branch
+  }];
+  let hasCustomAssemblyFormat = 1;
+  
+  let extraClassDeclaration = [{
+    // Whether this branch has a condition
+    bool hasCondition() { return getCond() != nullptr; }
+  }];
+}
+
+def Mt_SbrRegOp :
+  Mt_Op<"SBR_reg">,
+  Arguments<(ins I64:$target, Optional<I64>:$cond)> {
+  let summary = "Scalar branch to register address operation";
+  let description = [{
+    This operation implements a branch to the address contained in a register.
+    It has 6 branch delay slots. The branch target is specified by a register.
+    Optionally controlled by a condition register (R0-R6).
+    
+    Example:
+      mt.sbr_reg %addr : i64                   // Unconditional branch
+      mt.sbr_reg %addr, %cond : i64, i64       // Conditional branch
+  }];
+  let hasCustomAssemblyFormat = 1;
+  
+  let extraClassDeclaration = [{
+    // Whether this branch has a condition
+    bool hasCondition() { return getCond() != nullptr; }
+  }];
+}
+
 #endif // MT_IR_MTOPS

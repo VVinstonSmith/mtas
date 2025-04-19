@@ -45,4 +45,13 @@ def LowerFtmToMt : Pass<"lower-ftm-to-mt", "func::FuncOp"> {
   ];
 }
 
+def GenerateConditionAndLabelsForLoops : Pass<"generate-condition-and-labels-for-loops", "func::FuncOp"> {
+  let summary = "A pass to generate condition checking and labels for for loops";
+  let constructor = "mlir::mt::createGenerateConditionAndLabelsForLoopsPass()";
+  let dependentDialects = [
+    "mt::MtDialect",
+    "scf::SCFDialect"
+  ];
+}
+
 #endif // MTAS_DIALECT_MT_TRANSFORMS_PASSES
