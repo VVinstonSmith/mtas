@@ -36,4 +36,13 @@ def AllocateScalarRegistersForConstants : Pass<"allocate-scalar-registers-for-co
   ];
 }
 
+def LowerFtmToMt : Pass<"lower-ftm-to-mt", "func::FuncOp"> {
+  let summary = "A pass to lower all ftm dialect operations to mt dialect";
+  let constructor = "mlir::mt::createLowerFtmToMtPass()";
+  let dependentDialects = [
+    "mt::MtDialect",
+    "ftm::FtmDialect"
+  ];
+}
+
 #endif // MTAS_DIALECT_MT_TRANSFORMS_PASSES

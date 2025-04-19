@@ -71,7 +71,7 @@ private:
       }
       
       // 如果当前ID在范围内但未到范围末尾，则返回下一个ID
-      if (currentId >= start && currentId < end) {
+      if (currentId >= start && currentId <= end) {
         return currentId + 1;
       }
       

@@ -40,6 +40,9 @@ std::unique_ptr<Pass> createConvertForOpIndexToI64Pass();
 /// Create a pass to allocate scalar registers for constants
 std::unique_ptr<Pass> createAllocateScalarRegistersForConstantsPass();
 
+/// Create a pass to lower all ftm dialect operations to mt dialect
+std::unique_ptr<Pass> createLowerFtmToMtPass();
+
 //===----------------------------------------------------------------------===//
 // Registration
 //===----------------------------------------------------------------------===//

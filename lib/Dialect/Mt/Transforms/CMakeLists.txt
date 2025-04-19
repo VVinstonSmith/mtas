@@ -2,6 +2,7 @@ add_mlir_dialect_library(MLIRMtTransforms
     AllocateAddressRegisters.cpp
     ConvertForOpIndexToI64.cpp
     AllocateScalarRegistersForConstants.cpp
+    LowerFtmToMt.cpp
 
     ADDITIONAL_HEADER_DIRS
     ${MTAS_SOURCE_DIR}/include/mtas/Dialect/Mt
