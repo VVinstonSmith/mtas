@@ -8,7 +8,7 @@
 #ifndef MT_IR_MTBASE
 #define MT_IR_MTBASE
 
-// include "mtas/Dialect/Mt/IR/MtEnums.td"
+include "mtas/Dialect/Mt/IR/MtEnums.td"
 
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"

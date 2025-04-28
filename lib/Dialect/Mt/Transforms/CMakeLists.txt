@@ -4,6 +4,10 @@ add_mlir_dialect_library(MLIRMtTransforms
     AllocateScalarRegistersForConstants.cpp
     LowerFtmToMt.cpp
     GenerateConditionAndLabelsForLoops.cpp
+    InstructionSchedulingAndPacking.cpp
+    DependencyGraph.cpp
+    DependencyAnalyzer.cpp
+    ExecutionPacketUtils.cpp
 
     ADDITIONAL_HEADER_DIRS
     ${MTAS_SOURCE_DIR}/include/mtas/Dialect/Mt
@@ -12,5 +16,6 @@ add_mlir_dialect_library(MLIRMtTransforms
     MLIRMtPassIncGen
 
     LINK_LIBS PUBLIC
+    MLIRMtDialect
     MLIRTransformDialectTransforms
 )

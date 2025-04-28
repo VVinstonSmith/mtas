@@ -54,4 +54,13 @@ def GenerateConditionAndLabelsForLoops : Pass<"generate-condition-and-labels-for
   ];
 }
 
+def InstructionSchedulingAndPacking : Pass<"instruction-scheduling-and-packing", "func::FuncOp"> {
+  let summary = "A pass to perform instruction scheduling and packing";
+  let constructor = "mlir::mt::createInstructionSchedulingAndPackingPass()";
+  let dependentDialects = [
+    "mt::MtDialect"
+  ];
+}
+
+
 #endif // MTAS_DIALECT_MT_TRANSFORMS_PASSES

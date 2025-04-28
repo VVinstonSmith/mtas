@@ -63,6 +63,12 @@
     "thread": "cpp",
     "typeinfo": "cpp",
     "variant": "cpp",
-    "*.inc": "cpp"
+    "*.inc": "cpp",
+    "bitset": "cpp",
+    "cfenv": "cpp",
+    "__nullptr": "cpp",
+    "__functional_03": "cpp",
+    "target": "cpp",
+    "iomanip": "cpp"
   }
 }

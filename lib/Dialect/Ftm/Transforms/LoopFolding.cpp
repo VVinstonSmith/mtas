@@ -55,15 +55,40 @@ bool applyLoopFolding(scf::ForOp loopOp) {
   builder.setInsertionPoint(loopOp);
   IRMapping mapping;
 
-  for(int pos = lowerBound; pos < upperBound; pos += loopStep) {
+  for(auto pos = lowerBound; pos < upperBound; pos += loopStep) {
     auto inductVar = builder.create<arith::ConstantIndexOp>(loc, pos);
     mapping.map(loopOp.getInductionVar(), inductVar);
+
+    // 当前迭代的索引值
+    auto currentIndex = pos;
+
     loopOp.walk([&](Operation *op) {
       if(op->getParentOp() != loopOp)
         return WalkResult::skip();
       if(isa<scf::YieldOp>(op))
         return WalkResult::interrupt();
       auto newOp = builder.clone(*op, mapping);
+      // 检查是否是FMA操作
+      if (auto fmaOp = dyn_cast<ftm::FMAOp>(newOp)) {
+        // 检查是否有"matmul.n"属性
+        if (fmaOp->hasAttr("matmul.n")) {
+          // 如果已有n属性，说明此循环是m循环
+          fmaOp->setAttr("matmul.m", builder.getI32IntegerAttr(currentIndex));
+          // 判断当前loopOp是否有ftm.unroll_segment属性
+          if(loopOp->hasAttr("ftm.unroll_segment")){
+            // 获取属性
+            if (auto ftmAttr = dyn_cast<mlir::ftm::UnrollSegmentAttr>(
+                loopOp->getAttr("ftm.unroll_segment"))) {
+              // 获取segmentId参数值
+              auto kValue = ftmAttr.getSegmentId() ? ftmAttr.getSegmentId() : 0;
+              fmaOp->setAttr("matmul.k", builder.getI32IntegerAttr(kValue));
+            }
+          }
+        } else {
+          // 如果没有n属性，说明此循环是n循环
+          fmaOp->setAttr("matmul.n", builder.getI32IntegerAttr(currentIndex / 32));
+        }
+      }
       return WalkResult::advance();
     });
   }

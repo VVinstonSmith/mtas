@@ -30,6 +30,6 @@ void mlir::mt::MtDialect::initialize() {
 //         >();
 }
 
-// #include "mtas/Dialect/Mt/IR/MtEnums.cpp.inc"
+#include "mtas/Dialect/Mt/IR/MtEnums.cpp.inc"
 
 #include "mtas/Dialect/Mt/IR/MtOpsDialect.cpp.inc"

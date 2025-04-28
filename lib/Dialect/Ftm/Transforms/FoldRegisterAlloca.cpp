@@ -193,8 +193,12 @@ bool replaceLoadAndStoreWithRegister(Operation* op) {
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPointAfter(defOp);
     if(auto fma = dyn_cast<ftm::FMAOp>(defOp)) {
-      builder.create<ftm::VFMAOp>(loc,
+      auto vfmaOp = builder.create<ftm::VFMAOp>(loc,
           fma.getLhs(), fma.getRhs(), fma.getAcc(), regDecVal);
+      // 复制原FMAOp的所有属性到新创建的VFMAOp
+      for (auto namedAttr : fma->getAttrs()) {
+        vfmaOp->setAttr(namedAttr.getName(), namedAttr.getValue());
+      }
     }
     //  else if(auto movi = dyn_cast<ftm::MoviOp>(defOp)) {
     //   builder.create<ftm::VmoviOp>(loc, movi.getImm(), movi.getReg());

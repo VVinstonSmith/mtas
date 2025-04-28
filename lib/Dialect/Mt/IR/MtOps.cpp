@@ -7,6 +7,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "mtas/Dialect/Mt/IR/Mt.h"
+#include "mtas/Dialect/Ftm/IR/Ftm.h"
+#include "mtas/Dialect/Mt/IR/InstructionFormatter.h"
 
 #include "mlir/AsmParser/AsmParser.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -25,6 +27,8 @@
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include <optional>
+#include <sstream>   // 用于std::ostringstream
+#include <iomanip>   // 用于std::setw和std::left
 
 using namespace mlir;
 using namespace mlir::mt;
@@ -41,8 +45,177 @@ void MtDialect::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
+// Mt_DeclareRegisterOp
+//===----------------------------------------------------------------------===//
+
+std::string DeclareRegisterOp::formatRegisterOutput(){
+  auto memLevel = this->getOperation()->getAttr(ftm::MemLevelAttr::name).cast<ftm::MemLevelAttr>().getLevel();
+  auto regId = this->getOperation()->getAttr(ftm::RegisterIdAttr::name).cast<ftm::RegisterIdAttr>().getId();
+  std::ostringstream oss;
+  switch (memLevel){
+    case ftm::Cache::AddressRegister:
+      oss << "AR" << regId;
+      break;
+    case ftm::Cache::OffsetRegister:
+      oss << "OR" << regId;
+      break;
+    case ftm::Cache::ScalarRegister:
+      oss << "R" << regId;
+      break;
+    case ftm::Cache::VectorRegister:
+      oss << "VR" << regId;
+      break;
+    default:
+      oss << "<Unknown>";
+      break;
+  }
+  return oss.str();
+}
+
+//===----------------------------------------------------------------------===//
+// Mt_SmvagaOp
+//===----------------------------------------------------------------------===//
+
+llvm::SmallVector<mlir::Value, 3> SmvagaOp::getReadRegisters(){
+  return {getSrc()};
+}
+
+Value SmvagaOp::getWrittenRegister(){
+  return getDst();
+}
+
+int SmvagaOp::getLatency(){
+  return 2;
+}
+
+llvm::SmallVector<mlir::mt::FunctionalUnit, 2> SmvagaOp::getFunctionalUnits() {
+  return {mt::FunctionalUnit::SMAC};
+}
+
+std::string SmvagaOp::formatOperationOutput(StringRef functionalUnit){
+  std::ostringstream oss;
+  std::string opName = InstructionFormatter::formatInstructionName("SMVAGA", functionalUnit);
+  // 使用setw设置字段宽度为18，并使用left进行左对齐
+  oss << std::left << std::setw(18) << opName;
+
+  std::string regName = InstructionFormatter::formatOperandList({getSrc(), getDst()});
+  oss << std::left << std::setw(28) << regName;
+  
+  return oss.str();
+}
+
+//===----------------------------------------------------------------------===//
+// Mt_SmoviOp
+//===----------------------------------------------------------------------===//
+
+llvm::SmallVector<mlir::Value, 3> SmoviOp::getReadRegisters(){
+  return {};
+}
+
+Value SmoviOp::getWrittenRegister(){
+  return getReg();
+}
+
+int SmoviOp::getLatency(){
+  return 1;
+}
+
+llvm::SmallVector<mlir::mt::FunctionalUnit, 2> SmoviOp::getFunctionalUnits() {
+  return {mt::FunctionalUnit::SMAC, mt::FunctionalUnit::SIEU};
+}
+
+int SmoviOp::getSchedulingPriority(){
+  return 0;
+}
+
+std::string SmoviOp::formatOperationOutput(StringRef functionalUnit){
+  std::ostringstream oss;
+  std::string opName = InstructionFormatter::formatInstructionName("SMOVI", functionalUnit);
+  // 使用setw设置字段宽度为18，并使用left进行左对齐
+  oss << std::left << std::setw(18) << opName;
+
+  std::string operand = InstructionFormatter::formatDecimalImmediate(getImm());
+  operand.append(", ");
+  operand.append(InstructionFormatter::formatRegisterName(getReg()));
+  oss << std::left << std::setw(28) << operand;
+  
+  return oss.str();
+}
+
+//===----------------------------------------------------------------------===//
+// Mt_VmoviOp
+//===----------------------------------------------------------------------===//
+
+llvm::SmallVector<mlir::Value, 3> VmoviOp::getReadRegisters(){
+  return {};
+}
+
+Value VmoviOp::getWrittenRegister(){
+  return getReg();
+}
+
+int VmoviOp::getLatency(){
+  return 1;
+}
+
+llvm::SmallVector<mlir::mt::FunctionalUnit, 2> VmoviOp::getFunctionalUnits() {
+  return {mt::FunctionalUnit::VMAC, mt::FunctionalUnit::VIEU};
+}
+
+int VmoviOp::getSchedulingPriority(){
+  return 0;
+}
+
+std::string VmoviOp::formatOperationOutput(StringRef functionalUnit){
+  std::ostringstream oss;
+  std::string opName = InstructionFormatter::formatInstructionName("VMOVI", functionalUnit);
+  // 使用setw设置字段宽度为18，并使用left进行左对齐
+  oss << std::left << std::setw(18) << opName;
+
+  std::string operand = InstructionFormatter::formatHexImmediate(getImm());
+  operand.append(", ");
+  operand.append(InstructionFormatter::formatRegisterName(getReg()));
+  oss << std::left << std::setw(28) << operand;
+  
+  return oss.str();
+}
+
+//===----------------------------------------------------------------------===//
 // Mt_SldwOp
 //===----------------------------------------------------------------------===//
+
+llvm::SmallVector<mlir::Value, 3> SldwOp::getReadRegisters(){
+  llvm::SmallVector<mlir::Value, 3> ReadRegs{getBase()};
+  if(getOffset())
+    ReadRegs.push_back(getOffset());
+  return ReadRegs;
+}
+
+Value SldwOp::getWrittenRegister(){
+  return getDst();
+}
+
+int SldwOp::getLatency(){
+  return 7;
+}
+
+llvm::SmallVector<mlir::mt::FunctionalUnit, 2> SldwOp::getFunctionalUnits() {
+  return {mt::FunctionalUnit::SLDST};
+}
+
+std::string SldwOp::formatOperationOutput(StringRef functionalUnit){
+  std::ostringstream oss;
+  std::string opName = InstructionFormatter::formatInstructionName("SLDW", functionalUnit);
+  // 使用setw设置字段宽度为18，并使用left进行左对齐
+  oss << std::left << std::setw(18) << opName;
+
+  std::string operand = InstructionFormatter::formatMemoryOperand(getBase(), getOffset());
+  operand.append(", ");
+  operand.append(InstructionFormatter::formatRegisterName(getDst()));
+  oss << std::left << std::setw(28) << operand;
+  
+  return oss.str();
+}
 
 ParseResult SldwOp::parse(OpAsmParser &parser, OperationState &result) {
   OpAsmParser::UnresolvedOperand baseInfo;
@@ -118,6 +291,39 @@ void SldwOp::print(OpAsmPrinter &p) {
 //===----------------------------------------------------------------------===//
 // Mt_VldwOp
 //===----------------------------------------------------------------------===//
+
+llvm::SmallVector<mlir::Value, 3> VldwOp::getReadRegisters(){
+  llvm::SmallVector<mlir::Value, 3> ReadRegs{getBase()};
+  if(getOffset())
+    ReadRegs.push_back(getOffset());
+  return ReadRegs;
+}
+
+Value VldwOp::getWrittenRegister(){
+  return getDst();
+}
+
+int VldwOp::getLatency(){
+  return 9;
+}
+
+llvm::SmallVector<mlir::mt::FunctionalUnit, 2> VldwOp::getFunctionalUnits() {
+  return {mt::FunctionalUnit::VLDST};
+}
+
+std::string VldwOp::formatOperationOutput(StringRef functionalUnit){
+  std::ostringstream oss;
+  std::string opName = InstructionFormatter::formatInstructionName("VLDW", functionalUnit);
+  // 使用setw设置字段宽度为18，并使用left进行左对齐
+  oss << std::left << std::setw(18) << opName;
+
+  std::string operand = InstructionFormatter::formatMemoryOperand(getBase(), getOffset());
+  operand.append(", ");
+  operand.append(InstructionFormatter::formatRegisterName(getDst()));
+  oss << std::left << std::setw(28) << operand;
+  
+  return oss.str();
+}
 
 ParseResult VldwOp::parse(OpAsmParser &parser, OperationState &result) {
   OpAsmParser::UnresolvedOperand baseInfo;
@@ -195,6 +401,39 @@ void VldwOp::print(OpAsmPrinter &p) {
 // Mt_VstwOp
 //===----------------------------------------------------------------------===//
 
+llvm::SmallVector<mlir::Value, 3> VstwOp::getReadRegisters(){
+  llvm::SmallVector<mlir::Value, 3> ReadRegs{getSrc(), getBase()};
+  if(getOffset())
+    ReadRegs.push_back(getOffset());
+  return ReadRegs;
+}
+
+Value VstwOp::getWrittenRegister(){
+  return nullptr;
+}
+
+int VstwOp::getLatency(){
+  return 4;
+}
+
+llvm::SmallVector<mlir::mt::FunctionalUnit, 2> VstwOp::getFunctionalUnits() {
+  return {mt::FunctionalUnit::VLDST};
+}
+
+std::string VstwOp::formatOperationOutput(StringRef functionalUnit){
+  std::ostringstream oss;
+  std::string opName = InstructionFormatter::formatInstructionName("VSTW", functionalUnit);
+  // 使用setw设置字段宽度为18，并使用left进行左对齐
+  oss << std::left << std::setw(18) << opName;
+
+  std::string operand = InstructionFormatter::formatRegisterName(getSrc());
+  operand.append(", ");
+  operand.append(InstructionFormatter::formatMemoryOperand(getBase(), getOffset()));
+  oss << std::left << std::setw(28) << operand;
+  
+  return oss.str();
+}
+
 ParseResult VstwOp::parse(OpAsmParser &parser, OperationState &result) {
   OpAsmParser::UnresolvedOperand srcInfo;
   OpAsmParser::UnresolvedOperand baseInfo;
@@ -271,6 +510,327 @@ void VstwOp::print(OpAsmPrinter &p) {
 }
 
 //===----------------------------------------------------------------------===//
+// Mt_SvbcastOp
+//===----------------------------------------------------------------------===//
+
+llvm::SmallVector<mlir::Value, 3> SvbcastOp::getReadRegisters(){
+  return {getSrc()};
+}
+
+Value SvbcastOp::getWrittenRegister(){
+  return getDst();
+}
+
+int SvbcastOp::getLatency(){
+  return 4;
+}
+
+llvm::SmallVector<mlir::mt::FunctionalUnit, 2> SvbcastOp::getFunctionalUnits() {
+  return {mt::FunctionalUnit::SMAC};
+}
+
+std::string SvbcastOp::formatOperationOutput(StringRef functionalUnit){
+  std::ostringstream oss;
+  std::string opName = InstructionFormatter::formatInstructionName("SVBCAST", functionalUnit);
+  // 使用setw设置字段宽度为18，并使用left进行左对齐
+  oss << std::left << std::setw(18) << opName;
+
+  std::string regName = InstructionFormatter::formatOperandList({getSrc(), getDst()});
+  oss << std::left << std::setw(28) << regName;
+  
+  return oss.str();
+}
+
+//===----------------------------------------------------------------------===//
+// Mt_Vbale2Op
+//===----------------------------------------------------------------------===//
+
+llvm::SmallVector<mlir::Value, 3> Vbale2Op::getReadRegisters(){
+  return {getSrc1(), getSrc2()};
+}
+
+Value Vbale2Op::getWrittenRegister(){
+  return getDst();
+}
+
+int Vbale2Op::getLatency(){
+  return 1;
+}
+
+llvm::SmallVector<mlir::mt::FunctionalUnit, 2> Vbale2Op::getFunctionalUnits() {
+  return {mt::FunctionalUnit::VIEU};
+}
+
+std::string Vbale2Op::formatOperationOutput(StringRef functionalUnit){
+  std::ostringstream oss;
+  std::string opName = InstructionFormatter::formatInstructionName("VBALE2", functionalUnit);
+  // 使用setw设置字段宽度为18，并使用left进行左对齐
+  oss << std::left << std::setw(18) << opName;
+
+  std::string regName = InstructionFormatter::formatOperandList({getSrc1(), getSrc2(), getDst()});
+  oss << std::left << std::setw(28) << regName;
+  
+  return oss.str();
+}
+
+//===----------------------------------------------------------------------===//
+// Mt_Vbale2hOp
+//===----------------------------------------------------------------------===//
+
+llvm::SmallVector<mlir::Value, 3> Vbale2hOp::getReadRegisters(){
+  return {getSrc1(), getSrc2()};
+}
+
+Value Vbale2hOp::getWrittenRegister(){
+  return getDst();
+}
+
+int Vbale2hOp::getLatency(){
+  return 1;
+}
+
+llvm::SmallVector<mlir::mt::FunctionalUnit, 2> Vbale2hOp::getFunctionalUnits() {
+  return {mt::FunctionalUnit::VIEU};
+}
+
+std::string Vbale2hOp::formatOperationOutput(StringRef functionalUnit){
+  std::ostringstream oss;
+  std::string opName = InstructionFormatter::formatInstructionName("VBALE2h", functionalUnit);
+  // 使用setw设置字段宽度为18，并使用left进行左对齐
+  oss << std::left << std::setw(18) << opName;
+
+  std::string regName = InstructionFormatter::formatOperandList({getSrc1(), getSrc2(), getDst()});
+  oss << std::left << std::setw(28) << regName;
+  
+  return oss.str();
+}
+
+//===----------------------------------------------------------------------===//
+// Mt_Vfmulas32Op
+//===----------------------------------------------------------------------===//
+
+llvm::SmallVector<mlir::Value, 3> Vfmulas32Op::getReadRegisters(){
+  return {getSrc1(), getSrc2(), getSrc3()};
+}
+
+Value Vfmulas32Op::getWrittenRegister(){
+  return getDst();
+}
+
+int Vfmulas32Op::getLatency(){
+  return 6;
+}
+
+llvm::SmallVector<mlir::mt::FunctionalUnit, 2> Vfmulas32Op::getFunctionalUnits() {
+  return {mt::FunctionalUnit::VMAC};
+}
+
+std::string Vfmulas32Op::formatOperationOutput(StringRef functionalUnit){
+  std::ostringstream oss;
+  std::string opName = InstructionFormatter::formatInstructionName("VFMULAS32", functionalUnit);
+  // 使用setw设置字段宽度为18，并使用left进行左对齐
+  oss << std::left << std::setw(18) << opName;
+
+  std::string regName = InstructionFormatter::formatOperandList({getSrc1(), getSrc2(), getSrc3(), getDst()});
+  oss << std::left << std::setw(28) << regName;
+  
+  return oss.str();
+}
+
+//===----------------------------------------------------------------------===//
+// Mt_SmovOp
+//===----------------------------------------------------------------------===//
+
+llvm::SmallVector<mlir::Value, 3> SmovOp::getReadRegisters(){
+  return {getSrc()};
+}
+
+Value SmovOp::getWrittenRegister(){
+  return getDst();
+}
+
+int SmovOp::getLatency(){
+  return 1;
+}
+
+llvm::SmallVector<mlir::mt::FunctionalUnit, 2> SmovOp::getFunctionalUnits() {
+  return {mt::FunctionalUnit::SMAC, mt::FunctionalUnit::SIEU};
+}
+
+int SmovOp::getSchedulingPriority(){
+  return 0;
+}
+
+std::string SmovOp::formatOperationOutput(StringRef functionalUnit){
+  std::ostringstream oss;
+  std::string opName = InstructionFormatter::formatInstructionName("SMOV", functionalUnit);
+  // 使用setw设置字段宽度为18，并使用left进行左对齐
+  oss << std::left << std::setw(18) << opName;
+
+  std::string regName = InstructionFormatter::formatOperandList({getSrc(), getDst()});
+  oss << std::left << std::setw(28) << regName;
+  
+  return oss.str();
+}
+
+//===----------------------------------------------------------------------===//
+// Mt_VmovOp
+//===----------------------------------------------------------------------===//
+
+llvm::SmallVector<mlir::Value, 3> VmovOp::getReadRegisters(){
+  return {getSrc()};
+}
+
+Value VmovOp::getWrittenRegister(){
+  return getDst();
+}
+
+int VmovOp::getLatency(){
+  return 1;
+}
+
+llvm::SmallVector<mlir::mt::FunctionalUnit, 2> VmovOp::getFunctionalUnits() {
+  return {mt::FunctionalUnit::VMAC, mt::FunctionalUnit::VIEU};
+}
+
+int VmovOp::getSchedulingPriority(){
+  return 0;
+}
+
+std::string VmovOp::formatOperationOutput(StringRef functionalUnit){
+  std::ostringstream oss;
+  std::string opName = InstructionFormatter::formatInstructionName("VMOV", functionalUnit);
+  // 使用setw设置字段宽度为18，并使用left进行左对齐
+  oss << std::left << std::setw(18) << opName;
+
+  std::string regName = InstructionFormatter::formatOperandList({getSrc(), getDst()});
+  oss << std::left << std::setw(28) << regName;
+  
+  return oss.str();
+}
+
+//===----------------------------------------------------------------------===//
+// Mt_AddaOp
+//===----------------------------------------------------------------------===//
+
+llvm::SmallVector<mlir::Value, 3> AddaOp::getReadRegisters(){
+  return {getLhs(), getRhs()};
+}
+
+Value AddaOp::getWrittenRegister(){
+  return getRes();
+}
+
+int AddaOp::getLatency() {
+  // 获取操作数类型
+  Value lhs = getLhs();
+  
+  // 检查寄存器 ID 属性
+  if (auto declareRegisterOp = lhs.getDefiningOp<DeclareRegisterOp>()) {
+    // 如果是 DeclareRegisterOp 定义的寄存器，检查其 register_id
+    if (auto regIdAttr = declareRegisterOp->getAttr(
+            ftm::RegisterIdAttr::name).cast<ftm::RegisterIdAttr>()) {
+      // 获取寄存器 ID 值
+      uint32_t regId = regIdAttr.getId();
+      
+      if (regId < 8) {
+        return 3;
+      }
+    }
+  }
+
+  return 2;
+}
+
+llvm::SmallVector<mlir::mt::FunctionalUnit, 2> AddaOp::getFunctionalUnits() {
+  return {mt::FunctionalUnit::SIEU, mt::FunctionalUnit::SMAC};
+}
+
+int AddaOp::getSchedulingPriority(){
+  return 0;
+}
+
+std::string AddaOp::formatOperationOutput(StringRef functionalUnit){
+  std::ostringstream oss;
+  std::string opName = InstructionFormatter::formatInstructionName("ADDA", functionalUnit);
+  // 使用setw设置字段宽度为18，并使用left进行左对齐
+  oss << std::left << std::setw(18) << opName;
+
+  std::string regName = InstructionFormatter::formatOperandList({getLhs(), getRhs(), getRes()});
+  oss << std::left << std::setw(28) << regName;
+  
+  return oss.str();
+}
+
+//===----------------------------------------------------------------------===//
+// Mt_SaddOp
+//===----------------------------------------------------------------------===//
+
+llvm::SmallVector<mlir::Value, 3> SaddOp::getReadRegisters(){
+  return {getLhs(), getRhs()};
+}
+
+Value SaddOp::getWrittenRegister(){
+  return getRes();
+}
+
+int SaddOp::getLatency(){
+  return 1;
+}
+
+llvm::SmallVector<mlir::mt::FunctionalUnit, 2> SaddOp::getFunctionalUnits() {
+  return {mt::FunctionalUnit::SMAC, mt::FunctionalUnit::SIEU};
+}
+
+int SaddOp::getSchedulingPriority(){
+  return 0;
+}
+
+std::string SaddOp::formatOperationOutput(StringRef functionalUnit){
+  std::ostringstream oss;
+  std::string opName = InstructionFormatter::formatInstructionName("SADD", functionalUnit);
+  // 使用setw设置字段宽度为18，并使用left进行左对齐
+  oss << std::left << std::setw(18) << opName;
+
+  std::string regName = InstructionFormatter::formatOperandList({getLhs(), getRhs(), getRes()});
+  oss << std::left << std::setw(28) << regName;
+  
+  return oss.str();
+}
+
+//===----------------------------------------------------------------------===//
+// Mt_SltOp
+//===----------------------------------------------------------------------===//
+
+llvm::SmallVector<mlir::Value, 3> SltOp::getReadRegisters(){
+  return {getLhs(), getRhs()};
+}
+
+Value SltOp::getWrittenRegister(){
+  return getRes();
+}
+
+int SltOp::getLatency(){
+  return 1;
+}
+
+llvm::SmallVector<mlir::mt::FunctionalUnit, 2> SltOp::getFunctionalUnits() {
+  return {mt::FunctionalUnit::SIEU};
+}
+
+std::string SltOp::formatOperationOutput(StringRef functionalUnit){
+  std::ostringstream oss;
+  std::string opName = InstructionFormatter::formatInstructionName("SLT", functionalUnit);
+  // 使用setw设置字段宽度为18，并使用left进行左对齐
+  oss << std::left << std::setw(18) << opName;
+
+  std::string regName = InstructionFormatter::formatOperandList({getLhs(), getRhs(), getRes()});
+  oss << std::left << std::setw(28) << regName;
+  
+  return oss.str();
+}
+
+//===----------------------------------------------------------------------===//
 // Mt_LabelOp
 //===----------------------------------------------------------------------===//
 
@@ -295,6 +855,31 @@ void LabelOp::print(OpAsmPrinter &p) {
 //===----------------------------------------------------------------------===//
 // Mt_SbrLabelOp
 //===----------------------------------------------------------------------===//
+
+llvm::SmallVector<mlir::Value, 3> SbrLabelOp::getReadRegisters(){
+  if(getCond())
+    return {getCond()};
+  return {};
+}
+
+Value SbrLabelOp::getWrittenRegister(){
+  return nullptr;
+}
+
+int SbrLabelOp::getLatency(){
+  return 7;
+}
+
+llvm::SmallVector<mlir::mt::FunctionalUnit, 2> SbrLabelOp::getFunctionalUnits() {
+  return {mt::FunctionalUnit::SBR};
+}
+
+std::string SbrLabelOp::formatOperationOutput(StringRef functionalUnit){
+  std::ostringstream oss;
+  oss << std::left << std::setw(18) << InstructionFormatter::formatBranchWithCondition("SBR", getCond());
+  oss << std::left << std::setw(28) << getLabel().str();
+  return oss.str();
+}
 
 ParseResult SbrLabelOp::parse(OpAsmParser &parser, OperationState &result) {
   StringAttr labelAttr;
@@ -353,6 +938,31 @@ void SbrLabelOp::print(OpAsmPrinter &p) {
 //===----------------------------------------------------------------------===//
 // Mt_SbrRegOp
 //===----------------------------------------------------------------------===//
+
+llvm::SmallVector<mlir::Value, 3> SbrRegOp::getReadRegisters(){
+  if(getCond())
+    return {getCond()};
+  return {};
+}
+
+Value SbrRegOp::getWrittenRegister(){
+  return nullptr;
+}
+
+int SbrRegOp::getLatency(){
+  return 7;
+}
+
+llvm::SmallVector<mlir::mt::FunctionalUnit, 2> SbrRegOp::getFunctionalUnits() {
+  return {mt::FunctionalUnit::SBR};
+}
+
+std::string SbrRegOp::formatOperationOutput(StringRef functionalUnit){
+  std::ostringstream oss;
+  oss << std::left << std::setw(18) << InstructionFormatter::formatBranchWithCondition("SBR", getCond());
+  oss << std::left << std::setw(28) << InstructionFormatter::formatRegisterName(getTarget());
+  return oss.str();
+}
 
 ParseResult SbrRegOp::parse(OpAsmParser &parser, OperationState &result) {
   OpAsmParser::UnresolvedOperand targetInfo;

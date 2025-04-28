@@ -46,6 +46,9 @@ std::unique_ptr<Pass> createLowerFtmToMtPass();
 /// Create a pass to generate condition checking and labels for for loops
 std::unique_ptr<Pass> createGenerateConditionAndLabelsForLoopsPass();
 
+/// Create a pass to perform instruction scheduling and packing
+std::unique_ptr<Pass> createInstructionSchedulingAndPackingPass();
+
 //===----------------------------------------------------------------------===//
 // Registration
 //===----------------------------------------------------------------------===//

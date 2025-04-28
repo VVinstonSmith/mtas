@@ -18,19 +18,29 @@ include "mlir/Interfaces/DestinationStyleOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ShapedOpInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
+include "mtas/Dialect/Mt/IR/InstructionSchedulingInterface.td"
 
-// Base class for Mt dialect ops that do not correspond to library calls.
+
 class Mt_Op<string mnemonic, list<Trait> traits = []> :
-    Op<Mt_Dialect, mnemonic, traits>;
+  Op<Mt_Dialect, mnemonic, !listconcat(traits, [
+    DeclareOpInterfaceMethods<InstructionSchedulingInterface>,
+  ])>;
 
-def Mt_DeclareRegisterOp: Mt_Op<"declare_register">,
-    Results<(outs AnyType:$output)> {
+def Mt_DeclareRegisterOp: 
+  Op<Mt_Dialect, "declare_register", [Pure]>,
+  Results<(outs AnyType:$output)> {
   let summary = "declare register operation";
   let assemblyFormat = "attr-dict `:` type($output)";
+  let extraClassDeclaration = [{
+    // 格式化寄存器输出
+    std::string formatRegisterOutput();
+  }];
 }
 
 def Mt_SmvagaOp :
-  Op<Mt_Dialect, "SMVAGA", [AllTypesMatch<["src", "dst"]>]>,
+  Mt_Op<"SMVAGA", [
+    AllTypesMatch<["src", "dst"]>, 
+  ]>,
   Arguments<(ins AnyTypeOf<[I64, LLVM_AnyPointer]>:$src,
                  AnyTypeOf<[I64, LLVM_AnyPointer]>:$dst)>{
   let summary = "scalar move to address/offset register operation";
@@ -38,21 +48,32 @@ def Mt_SmvagaOp :
 }
 
 def Mt_SmoviOp :
-  Op<Mt_Dialect, "SMOVI">,
+  Mt_Op<"SMOVI", [
+  ]>,
   Arguments<(ins I64Attr:$imm, I64:$reg)>{
   let summary = "scalar move immediate operation";
   let assemblyFormat = "$imm `,` $reg attr-dict `:` type($reg)";
+  let extraClassDeclaration = [{
+    // 覆盖 getSchedulingPriority 方法
+    int getSchedulingPriority();
+  }];
 }
 
 def Mt_VmoviOp :
-  Op<Mt_Dialect, "VMOVI">,
+  Mt_Op<"VMOVI", [
+  ]>,
   Arguments<(ins I64Attr:$imm, VectorOfLengthAndType<[32], [F32]>:$reg)>{
   let summary = "vector move immediate operation";
   let assemblyFormat = "$imm `,` $reg attr-dict `:` type($reg)";
+  let extraClassDeclaration = [{
+    // 覆盖 getSchedulingPriority 方法
+    int getSchedulingPriority();
+  }];
 }
 
 def Mt_SldwOp :
-  Op<Mt_Dialect, "SLDW">,
+  Mt_Op<"SLDW", [
+  ]>,
   Arguments<(ins LLVM_AnyPointer:$base,
                  VectorOfLengthAndType<[2], [F32]>:$dst,
                  Optional<I64>:$offset)> {
@@ -61,7 +82,8 @@ def Mt_SldwOp :
 }
 
 def Mt_VldwOp :
-  Op<Mt_Dialect, "VLDW">,
+  Mt_Op<"VLDW", [
+  ]>,
   Arguments<(ins LLVM_AnyPointer:$base,
                  VectorOfLengthAndType<[32], [F32]>:$dst,
                  Optional<I64>:$offset)> {
@@ -70,7 +92,8 @@ def Mt_VldwOp :
 }
 
 def Mt_VstwOp :
-  Op<Mt_Dialect, "VSTW">,
+  Mt_Op<"VSTW", [
+  ]>,
   Arguments<(ins VectorOfLengthAndType<[32], [F32]>:$src,
                  LLVM_AnyPointer:$base,
                  Optional<I64>:$offset)> {
@@ -79,7 +102,8 @@ def Mt_VstwOp :
 }
 
 def Mt_SvbcastOp :
-  Op<Mt_Dialect, "SVBCAST">,
+  Mt_Op<"SVBCAST", [
+  ]>,
   Arguments<(ins VectorOfLengthAndType<[2], [F32]>:$src,
                  VectorOfLengthAndType<[32], [F32]>:$dst)> {
   let summary = "scalar vector broadcast operation";
@@ -87,7 +111,8 @@ def Mt_SvbcastOp :
 }
 
 def Mt_Vbale2Op :
-  Op<Mt_Dialect, "VBALE2">,
+  Mt_Op<"VBALE2", [
+  ]>,
   Arguments<(ins VectorOfLengthAndType<[32], [F32]>:$src1,
                  VectorOfLengthAndType<[32], [F32]>:$src2,
                  VectorOfLengthAndType<[32], [F32]>:$dst)> {
@@ -96,7 +121,8 @@ def Mt_Vbale2Op :
 }
 
 def Mt_Vbale2hOp :
-  Op<Mt_Dialect, "VBALE2H">,
+  Mt_Op<"VBALE2H", [
+  ]>,
   Arguments<(ins VectorOfLengthAndType<[32], [F32]>:$src1,
                  VectorOfLengthAndType<[32], [F32]>:$src2,
                  VectorOfLengthAndType<[32], [F32]>:$dst)> {
@@ -105,7 +131,8 @@ def Mt_Vbale2hOp :
 }
 
 def Mt_Vfmulas32Op :
-  Op<Mt_Dialect, "VFMULAS32">,
+  Mt_Op<"VFMULAS32", [
+  ]>,
   Arguments<(ins VectorOfLengthAndType<[32], [F32]>:$src1,
                  VectorOfLengthAndType<[32], [F32]>:$src2,
                  VectorOfLengthAndType<[32], [F32]>:$src3,
@@ -115,23 +142,37 @@ def Mt_Vfmulas32Op :
 }
 
 def Mt_SmovOp :
-  Op<Mt_Dialect, "SMOV", [AllTypesMatch<["src", "dst"]>]>,
+  Mt_Op<"SMOV", [
+    AllTypesMatch<["src", "dst"]>,
+  ]>,
   Arguments<(ins I64:$src, 
                  I64:$dst)>{
   let summary = "scalar move operation";
   let assemblyFormat = "$src `,` $dst attr-dict `:` type($dst)";
+  let extraClassDeclaration = [{
+    // 覆盖 getSchedulingPriority 方法
+    int getSchedulingPriority();
+  }];
 }
 
 def Mt_VmovOp :
-  Op<Mt_Dialect, "VMOV", [AllTypesMatch<["src", "dst"]>]>,
+  Mt_Op<"VMOV", [
+    AllTypesMatch<["src", "dst"]>,
+  ]>,
   Arguments<(ins VectorOfAnyRankOf<[AnyFloat]>:$src,
                  VectorOfAnyRankOf<[AnyFloat]>:$dst)>{
   let summary = "vector move operation";
   let assemblyFormat = "$src `,` $dst attr-dict `:` type($dst)";
+  let extraClassDeclaration = [{
+    // 覆盖 getSchedulingPriority 方法
+    int getSchedulingPriority();
+  }];
 }
 
 def Mt_AddaOp :
-  Op<Mt_Dialect, "ADDA", [AllTypesMatch<["lhs", "res"]>]>,
+  Mt_Op<"ADDA", [
+    AllTypesMatch<["lhs", "res"]>,
+  ]>,
   Arguments<(ins LLVM_AnyPointer:$lhs,
                  I64:$rhs,
                  LLVM_AnyPointer:$res)>{
@@ -140,19 +181,31 @@ def Mt_AddaOp :
   let extraClassDeclaration = [{
     LLVM::LLVMPointerType getPointerType() { return ::llvm::cast<LLVM::LLVMPointerType>(getLhs().getType()); }
   }];
+  let extraClassDeclaration = [{
+    // 覆盖 getSchedulingPriority 方法
+    int getSchedulingPriority();
+  }];
 }
 
 def Mt_SaddOp :
-  Op<Mt_Dialect, "SADD", [AllTypesMatch<["lhs", "rhs", "res"]>]>,
+  Mt_Op<"SADD", [
+    AllTypesMatch<["lhs", "rhs", "res"]>,
+  ]>,
   Arguments<(ins I64:$lhs,
                  I64:$rhs,
                  I64:$res)>{
   let summary = "scalar addition operation";
   let assemblyFormat = "$lhs `,` $rhs `,` $res attr-dict `:` type($res)";
+  let extraClassDeclaration = [{
+    // 覆盖 getSchedulingPriority 方法
+    int getSchedulingPriority();
+  }];
 }
 
 def Mt_SltOp :
-  Op<Mt_Dialect, "SLT", [AllTypesMatch<["lhs", "rhs", "res"]>]>,
+  Mt_Op<"SLT", [
+    AllTypesMatch<["lhs", "rhs", "res"]>,
+  ]>,
   Arguments<(ins I64:$lhs,
                  I64:$rhs,
                  I64:$res)>{
@@ -161,7 +214,8 @@ def Mt_SltOp :
 }
 
 def Mt_LabelOp :
-  Mt_Op<"LABEL">,
+  Op<Mt_Dialect, "LABEL", [
+  ]>,
   Arguments<(ins StrAttr:$name)> {
   let summary = "Label operation for control flow";
   let description = [{
@@ -176,7 +230,8 @@ def Mt_LabelOp :
 }
 
 def Mt_SbrLabelOp :
-  Mt_Op<"SBR_label">,
+  Mt_Op<"SBR_label", [
+  ]>,
   Arguments<(ins StrAttr:$label, Optional<I64>:$cond)> {
   let summary = "Scalar branch to label operation";
   let description = [{
@@ -197,7 +252,8 @@ def Mt_SbrLabelOp :
 }
 
 def Mt_SbrRegOp :
-  Mt_Op<"SBR_reg">,
+  Mt_Op<"SBR_reg", [
+  ]>,
   Arguments<(ins I64:$target, Optional<I64>:$cond)> {
   let summary = "Scalar branch to register address operation";
   let description = [{

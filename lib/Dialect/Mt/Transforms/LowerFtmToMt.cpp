@@ -310,7 +310,11 @@ public:
     Value acc = adaptor.getAcc();
     Value dst = adaptor.getDst();
 
-    rewriter.create<mt::Vfmulas32Op>(op.getLoc(), lhs, rhs, acc, dst);
+    auto vfmulas32Op = rewriter.create<mt::Vfmulas32Op>(op.getLoc(), lhs, rhs, acc, dst);
+
+    for (auto namedAttr : op->getAttrs()) {
+      vfmulas32Op->setAttr(namedAttr.getName(), namedAttr.getValue());
+    }
 
     rewriter.eraseOp(op);
 
