@@ -43,6 +43,9 @@ std::unique_ptr<Pass> createAllocateScalarRegistersForConstantsPass();
 /// Create a pass to lower all ftm dialect operations to mt dialect
 std::unique_ptr<Pass> createLowerFtmToMtPass();
 
+/// Create a pass to reduce the number of 80-bit instructions
+std::unique_ptr<Pass> createReduce80BitInstructionsPass();
+
 /// Create a pass to generate condition checking and labels for for loops
 std::unique_ptr<Pass> createGenerateConditionAndLabelsForLoopsPass();
 

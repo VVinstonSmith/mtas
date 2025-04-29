@@ -45,6 +45,15 @@ def LowerFtmToMt : Pass<"lower-ftm-to-mt", "func::FuncOp"> {
   ];
 }
 
+def Reduce80BitInstructions : Pass<"reduce-80bit-instructions", "func::FuncOp"> {
+  let summary = "A pass to reduce the number of 80-bit instructions";
+  let description = "Optimizes code to use fewer 80-bit instructions by replacing them with equivalent sequences of narrower instructions where possible";
+  let constructor = "mlir::mt::createReduce80BitInstructionsPass()";
+  let dependentDialects = [
+    "mt::MtDialect"
+  ];
+}
+
 def GenerateConditionAndLabelsForLoops : Pass<"generate-condition-and-labels-for-loops", "func::FuncOp"> {
   let summary = "A pass to generate condition checking and labels for for loops";
   let constructor = "mlir::mt::createGenerateConditionAndLabelsForLoopsPass()";
