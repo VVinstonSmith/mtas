@@ -710,23 +710,23 @@ std::string VmovOp::formatOperationOutput(StringRef functionalUnit){
 }
 
 //===----------------------------------------------------------------------===//
-// Mt_AddaOp
+// Mt_SaddaOp
 //===----------------------------------------------------------------------===//
 
-llvm::SmallVector<mlir::Value, 3> AddaOp::getReadRegisters(){
+llvm::SmallVector<mlir::Value, 3> SaddaOp::getReadRegisters(){
   return {getLhs(), getRhs()};
 }
 
-Value AddaOp::getWrittenRegister(){
+Value SaddaOp::getWrittenRegister(){
   return getRes();
 }
 
-int AddaOp::getLatency() {
+int SaddaOp::getLatency() {
   // 获取操作数类型
-  Value lhs = getLhs();
+  Value rhs = getRhs();
   
   // 检查寄存器 ID 属性
-  if (auto declareRegisterOp = lhs.getDefiningOp<DeclareRegisterOp>()) {
+  if (auto declareRegisterOp = rhs.getDefiningOp<DeclareRegisterOp>()) {
     // 如果是 DeclareRegisterOp 定义的寄存器，检查其 register_id
     if (auto regIdAttr = declareRegisterOp->getAttr(
             ftm::RegisterIdAttr::name).cast<ftm::RegisterIdAttr>()) {
@@ -742,17 +742,17 @@ int AddaOp::getLatency() {
   return 2;
 }
 
-llvm::SmallVector<mlir::mt::FunctionalUnit, 2> AddaOp::getFunctionalUnits() {
+llvm::SmallVector<mlir::mt::FunctionalUnit, 2> SaddaOp::getFunctionalUnits() {
   return {mt::FunctionalUnit::SIEU, mt::FunctionalUnit::SMAC};
 }
 
-int AddaOp::getSchedulingPriority(){
+int SaddaOp::getSchedulingPriority(){
   return 0;
 }
 
-std::string AddaOp::formatOperationOutput(StringRef functionalUnit){
+std::string SaddaOp::formatOperationOutput(StringRef functionalUnit){
   std::ostringstream oss;
-  std::string opName = InstructionFormatter::formatInstructionName("ADDA", functionalUnit);
+  std::string opName = InstructionFormatter::formatInstructionName("SADDA", functionalUnit);
   // 使用setw设置字段宽度为18，并使用left进行左对齐
   oss << std::left << std::setw(18) << opName;
 

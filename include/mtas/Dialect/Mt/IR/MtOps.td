@@ -169,17 +169,17 @@ def Mt_VmovOp :
   }];
 }
 
-def Mt_AddaOp :
-  Mt_Op<"ADDA", [
-    AllTypesMatch<["lhs", "res"]>,
+def Mt_SaddaOp :
+  Mt_Op<"SADDA", [
+    AllTypesMatch<["rhs", "res"]>,
   ]>,
-  Arguments<(ins LLVM_AnyPointer:$lhs,
-                 I64:$rhs,
+  Arguments<(ins I64:$lhs,
+                 LLVM_AnyPointer:$rhs,
                  LLVM_AnyPointer:$res)>{
   let summary = "address addition operation";
   let assemblyFormat = "$lhs `,` $rhs `,` $res attr-dict `:` type($res)";
   let extraClassDeclaration = [{
-    LLVM::LLVMPointerType getPointerType() { return ::llvm::cast<LLVM::LLVMPointerType>(getLhs().getType()); }
+    LLVM::LLVMPointerType getPointerType() { return ::llvm::cast<LLVM::LLVMPointerType>(getRes().getType()); }
   }];
   let extraClassDeclaration = [{
     // 覆盖 getSchedulingPriority 方法

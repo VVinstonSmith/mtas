@@ -129,8 +129,8 @@ void implAllocateAddressRegisters(func::FuncOp funcOp) {
                         // 使用mt::adda（有副作用，无返回值）替换ftm::adda（无副作用，有返回值）
                         auto lhs = mapper.lookupOrDefault(addaOp.getLhs());
                         auto rhs = mapper.lookupOrDefault(addaOp.getRhs());
-                        nestedBuilder.create<mt::AddaOp>(op.getLoc(), 
-                            lhs, rhs, lhs);
+                        nestedBuilder.create<mt::SaddaOp>(op.getLoc(), 
+                            rhs, lhs, lhs);
                         continue;
                     }
 
