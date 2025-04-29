@@ -727,11 +727,11 @@ private:
     // 反向调度循环前的操作
     backwardSchedulePreLoopOps(graph, preLoopOps, scheduledOps, packetsBeforeLoop, windowSize);
     
-    // // 输出完整的调度结果
-    // llvm::outs() << "调度结果:\n";
-    // printSchedulingWindowAsTable(packetsBeforeLoop, true, windowSize - packetsBeforeLoop.size());
-    // printSchedulingWindowAsTable(schedulingWindow, false, windowSize);
-    // printSchedulingWindowAsTable(packetsAfterLoop, false, 2*windowSize);
+    // 输出完整的调度结果
+    llvm::outs() << "调度结果:\n";
+    printSchedulingWindowAsTable(packetsBeforeLoop, true, windowSize - packetsBeforeLoop.size());
+    printSchedulingWindowAsTable(schedulingWindow, false, windowSize);
+    printSchedulingWindowAsTable(packetsAfterLoop, false, 2*windowSize);
 
     // std::vector<std::pair<mt::InstructionSchedulingInterface, int>> sortedScheduledOps(scheduledOps.begin(), scheduledOps.end());
     // // 输出scheduledOps，按照cycle的顺序输出

@@ -340,6 +340,24 @@ public:
   }
 };
 
+class FtmSmvagaOpToMtSmvagaOp : public FtmToMtOpConversion<ftm::SmvagaOp> {
+public:
+  using FtmToMtOpConversion<ftm::SmvagaOp>::FtmToMtOpConversion;
+
+  LogicalResult
+  matchAndRewrite(ftm::SmvagaOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    Value src = adaptor.getSrc();
+    Value dst = adaptor.getDst();
+
+    rewriter.create<mt::SmvagaOp>(op.getLoc(), src, dst);
+
+    rewriter.eraseOp(op);
+
+    return success();
+  }
+};
+
 class FtmVmoviOpToMtVmoviOp : public FtmToMtOpConversion<ftm::VmoviOp> {
 public:
   using FtmToMtOpConversion<ftm::VmoviOp>::FtmToMtOpConversion;
@@ -419,6 +437,7 @@ public:
     target.addIllegalOp<ftm::VFMAOp>();
     target.addIllegalOp<ftm::FMAOp>();
     target.addIllegalOp<ftm::SmoviOp>();
+    target.addIllegalOp<ftm::SmvagaOp>();
     target.addIllegalOp<ftm::VmoviOp>();
     target.addIllegalOp<ftm::DeclareRegisterOp>();
     
@@ -443,6 +462,7 @@ public:
         FtmFMAOpToMtVfmulas32Op,
         FtmVFMAOpToMtVfmulas32Op,
         FtmSmoviOpToMtSmoviOp,
+        FtmSmvagaOpToMtSmvagaOp,
         FtmVmoviOpToMtVmoviOp,
         FtmDecRegOpToMtDecRegOp
     >(typeConverter, context, regAllocator);

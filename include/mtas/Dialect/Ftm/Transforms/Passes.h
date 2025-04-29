@@ -73,6 +73,9 @@ std::unique_ptr<Pass> createAddressBaseTransformationPass();
 /// Create a pass to eliminate identity cast operations (ptr->i64->ptr)
 std::unique_ptr<Pass> createEliminateIdentityCastsPass();
 
+/// Create a pass to convert ftm.smovi to ftm.smvaga for offset registers
+std::unique_ptr<Pass> createFixOffsetRegisterAssignmentPass();
+
 //===----------------------------------------------------------------------===//
 // Registration
 //===----------------------------------------------------------------------===//

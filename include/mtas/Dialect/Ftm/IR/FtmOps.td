@@ -203,6 +203,13 @@ def Ftm_SmoviOp :
   let assemblyFormat = "$imm `,` $reg attr-dict `:` type($reg)";
 }
 
+def Ftm_SmvagaOp :
+  Op<Ftm_Dialect, "smvaga">,
+    Arguments<(ins I64:$src, I64:$dst)> {
+  let summary = "scalar move to address register/offset register";
+  let assemblyFormat = "$src `,` $dst attr-dict `:` type($src)";
+}
+
 // def Ftm_MoviOp :
 //   Op<Ftm_Dialect, "movi", [Pure, AllTypesMatch<["reg", "result"]>]>,
 //     Arguments<(ins I64Attr:$imm, VectorOfAnyRankOf<[AnyFloat]>:$reg)>,

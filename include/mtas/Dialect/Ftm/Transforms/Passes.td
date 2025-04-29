@@ -214,4 +214,18 @@ def EliminateIdentityCasts : Pass<"eliminate-identity-casts", "func::FuncOp"> {
   ];
 }
 
+def FixOffsetRegisterAssignment : Pass<"fix-offset-register-assignment", "func::FuncOp"> {
+  let summary = "Fix bug: Convert ftm.smovi to ftm.smvaga for offset registers";
+  let description = "This pass fixes a bug where offset_register type registers can only be"
+                   " properly assigned using ftm.smvaga, not ftm.smovi. It identifies all"
+                   " ftm.declare_register operations with offset_register memory level and"
+                   " transforms any associated ftm.smovi operations into the correct sequence"
+                   " of arith.constant followed by ftm.smvaga.";
+  let constructor = "mlir::ftm::createFixOffsetRegisterAssignmentPass()";
+  let dependentDialects = [
+    "arith::ArithDialect",
+    "ftm::FtmDialect",
+  ];
+}
+
 #endif // MTAS_DIALECT_FTM_TRANSFORMS_PASSES
