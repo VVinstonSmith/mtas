@@ -35,8 +35,9 @@ public:
 private:
   // 定义可用寄存器ID范围
   const std::vector<std::pair<int64_t, int64_t>> availableRanges = {
-    {7, 31},   // 第一个范围
-    {42, 61}   // 第二个范围
+    {7, 9},
+    {26, 31},
+    {42, 61}
   };
 
   // 查找当前已使用的最大寄存器ID
@@ -60,6 +61,7 @@ private:
 
   // 获取下一个可用的寄存器ID
   int64_t getNextAvailableId(int64_t currentId) {
+    currentId++;
     // 遍历所有可用范围，找到适合的ID
     for (const auto &range : availableRanges) {
       int64_t start = range.first;
@@ -72,7 +74,7 @@ private:
       
       // 如果当前ID在范围内但未到范围末尾，则返回下一个ID
       if (currentId >= start && currentId <= end) {
-        return currentId + 1;
+        return currentId;
       }
       
       // 如果已到当前范围末尾，继续检查下一个范围

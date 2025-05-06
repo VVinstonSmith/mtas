@@ -77,7 +77,8 @@ std::string InstructionFormatter::formatRegisterName(Value value) {
         isa<func::FuncOp>(block->getParent()->getParentOp())) {
       // 获取参数索引
       unsigned paramIndex = blockArg.getArgNumber();
-      regName = "R" + std::to_string(10 + 2*paramIndex);
+      // regName = "R" + std::to_string(10 + 2*paramIndex);
+      regName = "%" + std::to_string(paramIndex);
     } else {
       // 如果不是函数参数，可能是其他块参数
       regName = "<Block parameters>";

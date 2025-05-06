@@ -18,8 +18,8 @@ using namespace mt;
 namespace {
 
 int64_t vectorAddressStartId = 0;
-int64_t vectorAddressEndId = 8;
-int64_t scalarAddressStartId = 8;
+int64_t vectorAddressEndId = 7;
+int64_t scalarAddressStartId = 10;
 int64_t scalarAddressEndId = 16;
 
 void implAllocateAddressRegisters(func::FuncOp funcOp) {

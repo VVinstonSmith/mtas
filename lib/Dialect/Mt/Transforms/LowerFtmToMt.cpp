@@ -42,8 +42,8 @@ private:
   
   // 可用范围定义
   const std::map<ftm::Cache, std::vector<std::pair<int64_t, int64_t>>> availableRanges = {
-    {ftm::Cache::ScalarRegister, {{7, 31}, {42, 61}}},  // 标量寄存器范围
-    {ftm::Cache::VectorRegister, {{0, 61}}}             // 向量寄存器范围
+    {ftm::Cache::ScalarRegister, {{7, 9}, {26, 31}, {42, 61}}},  // 标量寄存器范围
+    {ftm::Cache::VectorRegister, {{7, 61}}}             // 向量寄存器范围
   };
 
 public:
@@ -140,6 +140,26 @@ public:
     rewriter.setInsertionPoint(op);
     
     return regOp.getResult();
+  }
+};
+
+class LLVMConstantOpToMtSmoviOp : public FtmToMtOpConversion<LLVM::ConstantOp> {
+public:
+  using FtmToMtOpConversion<LLVM::ConstantOp>::FtmToMtOpConversion;
+
+  LogicalResult
+  matchAndRewrite(LLVM::ConstantOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // 创建标量寄存器
+    Value dst = createRegisterAndReplace(op, op.getType(), ftm::Cache::ScalarRegister, rewriter);
+    
+    // 获取常量值并创建SmoviOp
+    auto intValue = op.getValue().cast<IntegerAttr>().getInt();
+    rewriter.create<mt::SmoviOp>(op.getLoc(),
+                              IntegerAttr::get(rewriter.getI64Type(), intValue),
+                              dst);
+    
+    return success();
   }
 };
 
@@ -426,9 +446,9 @@ public:
     
     // 将Mt方言设为合法
     target.addLegalDialect<mt::MtDialect>();
-    target.addLegalOp<ftm::DeclareRegisterOp>();
 
     // 设置非法操作
+    target.addIllegalOp<LLVM::ConstantOp>();
     target.addIllegalOp<ftm::LoadOp>();
     target.addIllegalOp<ftm::StoreOp>();
     target.addIllegalOp<ftm::BroadcastOp>();
@@ -454,6 +474,7 @@ public:
     
     // 添加所有转换模式
     patterns.add<
+        LLVMConstantOpToMtSmoviOp,
         FtmLoadOpToMtLdwOp,
         FtmStoreOpToMtStwOp,
         FtmBroadcastOpToMtSvbcastOp,
