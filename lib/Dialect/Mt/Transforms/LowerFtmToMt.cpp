@@ -34,84 +34,12 @@ using namespace mt;
 
 namespace {
 
-// 统一的寄存器分配器类
-class RegisterAllocator {
-private:
-  // 已分配的寄存器ID集合
-  std::map<ftm::Cache, std::set<int64_t>> allocatedIds;
-  
-  // 可用范围定义
-  const std::map<ftm::Cache, std::vector<std::pair<int64_t, int64_t>>> availableRanges = {
-    {ftm::Cache::ScalarRegister, {{7, 9}, {26, 31}, {42, 61}}},  // 标量寄存器范围
-    {ftm::Cache::VectorRegister, {{7, 61}}}             // 向量寄存器范围
-  };
-
-public:
-  // 初始化寄存器跟踪
-  void initialize(func::FuncOp &funcOp) {
-    // 初始化为空集合
-    allocatedIds[ftm::Cache::ScalarRegister] = {};
-    allocatedIds[ftm::Cache::VectorRegister] = {};
-    
-    // 遍历所有的 DeclareRegisterOp 操作
-    funcOp.walk([&](ftm::DeclareRegisterOp declareOp) {
-      if (auto memLevelAttr = declareOp->getAttrOfType<ftm::MemLevelAttr>(ftm::MemLevelAttr::name)) {
-        ftm::Cache regType = memLevelAttr.getLevel();
-        
-        if (regType == ftm::Cache::ScalarRegister || regType == ftm::Cache::VectorRegister) {
-          if (auto regIdAttr = declareOp->getAttrOfType<ftm::RegisterIdAttr>(ftm::RegisterIdAttr::name)) {
-            int64_t id = regIdAttr.getId();
-            
-            // 记录已分配的 ID
-            allocatedIds[regType].insert(id);
-          }
-        }
-      }
-    });
-  }
-
-  // 获取最小的未分配寄存器ID
-  int64_t allocateRegister(ftm::Cache regType) {
-    // 获取对应类型的可用范围
-    const auto &ranges = availableRanges.at(regType);
-    
-    // 遍历所有可用范围，找到最小的未分配ID
-    for (const auto &range : ranges) {
-      int64_t start = range.first;
-      int64_t end = range.second;
-      
-      // 在当前范围内查找最小的未分配ID
-      for (int64_t id = start; id <= end; ++id) {
-        if (allocatedIds[regType].find(id) == allocatedIds[regType].end()) {
-          // 将新ID添加到已分配集合
-          allocatedIds[regType].insert(id);
-          return id;
-        }
-      }
-    }
-    
-    // 如果所有范围都已用尽，抛出错误
-    llvm::report_fatal_error(llvm::Twine("No available register IDs left for allocation of type ") + 
-                          llvm::Twine(static_cast<uint64_t>(regType)));
-    return -1;
-  }
-  
-  // 释放寄存器ID（如果需要）
-  void releaseRegister(ftm::Cache regType, int64_t id) {
-    allocatedIds[regType].erase(id);
-  }
-};
-
 // 基础模式匹配类，用于Ftm到Mt的转换
 template <typename FtmOpTy>
 class FtmToMtOpConversion : public OpConversionPattern<FtmOpTy> {
-protected:
-  RegisterAllocator &regAllocator;
 public:
-  FtmToMtOpConversion(TypeConverter &typeConverter, MLIRContext *context,
-                     RegisterAllocator &allocator)
-      : OpConversionPattern<FtmOpTy>(typeConverter, context), 
-        regAllocator(allocator) {}
+  FtmToMtOpConversion(TypeConverter &typeConverter, MLIRContext *context)
+      : OpConversionPattern<FtmOpTy>(typeConverter, context){}
 
   // 辅助方法：创建寄存器并替换原操作
   Value createRegisterAndReplace(Operation *op, Type resultType,
@@ -127,11 +55,6 @@ public:
     // 设置内存级别属性
     regOp->setAttr(ftm::MemLevelAttr::name, 
         ftm::MemLevelAttr::get(rewriter.getContext(), regType));
-    
-    // 分配ID
-    int64_t id = regAllocator.allocateRegister(regType);
-    regOp->setAttr(ftm::RegisterIdAttr::name, 
-        ftm::RegisterIdAttr::get(rewriter.getContext(), id));
     
     // 替换原操作
     rewriter.replaceOp(op, regOp.getResult());
@@ -500,10 +423,6 @@ public:
 
 class LowerFtmToMtPass : 
     public impl::LowerFtmToMtBase<LowerFtmToMtPass> {
-private:
-  // 创建分配器实例
-  RegisterAllocator regAllocator;
-
 public:
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
@@ -535,9 +454,6 @@ public:
     TypeConverter typeConverter;
     // 默认类型保持不变
     typeConverter.addConversion([](Type type) { return type; });
-
-    // 初始化寄存器分配器
-    regAllocator.initialize(funcOp);
     
     // 注册转换模式
     RewritePatternSet patterns(context);
@@ -558,7 +474,7 @@ public:
         FtmSmvagaOpToMtSmvagaOp,
         FtmVmoviOpToMtVmoviOp,
         FtmDecRegOpToMtDecRegOp
-    >(typeConverter, context, regAllocator);
+    >(typeConverter, context);
     
     // 应用转换
     if (failed(applyPartialConversion(funcOp, target, std::move(patterns))))

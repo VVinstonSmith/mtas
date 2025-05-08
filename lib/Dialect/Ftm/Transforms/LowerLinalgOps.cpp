@@ -207,21 +207,17 @@ bool implAddOpLowering(Operation *op) {
 
   Type decOutputType;
   ftm::Cache registerLevel;
-  int64_t registerId;
   if(operandMemLevels[2] == ftm::Cache::AM ||
       operandMemLevels[2] == ftm::Cache::VectorRegister) {
     decOutputType = elem1024BitTy;
     registerLevel = ftm::Cache::VectorRegister;
-    registerId = 63;
   } else {
     decOutputType = elem64BitTy;
     registerLevel = ftm::Cache::ScalarRegister;
-    registerId = 61;
   }
   builder.setInsertionPointToStart(&funcOp.getBody().front());
   auto declareOp = builder.create<ftm::DeclareRegisterOp>(loc, decOutputType);
   declareOp->setAttr(ftm::MemLevelAttr::name, MemLevelAttr::get(ctx, registerLevel));
-  declareOp->setAttr(ftm::RegisterIdAttr::name, RegisterIdAttr::get(ctx, registerId)); 
   
   Operation* moviOp = (registerLevel == ftm::Cache::VectorRegister) ?
       builder.create<ftm::VmoviOp>(loc, 

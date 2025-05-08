@@ -46,6 +46,17 @@ class FtmOp;
 
 #include "mtas/Dialect/Ftm/IR/FtmEnums.h.inc"
 
+namespace mlir {
+namespace ftm {
+
+inline bool isOffsetRegister(Cache enumValue){
+    return enumValue == Cache::VectorOffsetRegister || 
+           enumValue == Cache::ScalarOffsetRegister;
+}
+
+} // namespace ftm
+} // namespace mlir
+
 //===----------------------------------------------------------------------===//
 // Ftm Attributes
 //===----------------------------------------------------------------------===//

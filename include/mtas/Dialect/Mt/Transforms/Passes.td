@@ -63,6 +63,14 @@ def GenerateConditionAndLabelsForLoops : Pass<"generate-condition-and-labels-for
   ];
 }
 
+def AssignRegisterIds : Pass<"assign-register-ids", "func::FuncOp"> {
+  let summary = "A pass to assign unique IDs to registers";
+  let constructor = "mlir::mt::createAssignRegisterIdsPass()";
+  let dependentDialects = [
+    "mt::MtDialect",
+  ];
+}
+
 def InstructionSchedulingAndPacking : Pass<"instruction-scheduling-and-packing", "func::FuncOp"> {
   let summary = "A pass to perform instruction scheduling and packing";
   let constructor = "mlir::mt::createInstructionSchedulingAndPackingPass()";

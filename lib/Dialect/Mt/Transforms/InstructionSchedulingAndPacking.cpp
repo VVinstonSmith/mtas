@@ -119,13 +119,13 @@ private:
 
     for (auto it = toScheduleOps.begin(); it != toScheduleOps.end();) {
       auto op = *it;
-      llvm::outs() << "操作 " << *op  << "\n";
+      // llvm::outs() << "操作 " << *op  << "\n";
       auto next_it = std::next(it); // 提前保存下一个迭代器
       // 判断该操作的出边是否都在循环外
       bool canSchedule = true;
       for (auto [target, type, latency] : graph.getIntraLoopOutgoingDependencies(op)) {
         // 如果target在循环内，不能进行调度
-        llvm::outs() << *target.getOperation() << "\n";
+        // llvm::outs() << *target.getOperation() << "\n";
         if (inLoopOps.find(target) != inLoopOps.end()) {
           canSchedule = false;
           break;

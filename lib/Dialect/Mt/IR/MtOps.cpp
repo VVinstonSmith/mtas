@@ -53,13 +53,16 @@ std::string DeclareRegisterOp::formatRegisterOutput(){
   auto regId = this->getOperation()->getAttr(ftm::RegisterIdAttr::name).cast<ftm::RegisterIdAttr>().getId();
   std::ostringstream oss;
   switch (memLevel){
-    case ftm::Cache::AddressRegister:
+    case ftm::Cache::VectorAddressRegister:
+    case ftm::Cache::ScalarAddressRegister:
       oss << "AR" << regId;
       break;
-    case ftm::Cache::OffsetRegister:
+    case ftm::Cache::VectorOffsetRegister:
+    case ftm::Cache::ScalarOffsetRegister:
       oss << "OR" << regId;
       break;
     case ftm::Cache::ScalarRegister:
+    case ftm::Cache::ScalarConditionRegister:
       oss << "R" << regId;
       break;
     case ftm::Cache::VectorRegister:

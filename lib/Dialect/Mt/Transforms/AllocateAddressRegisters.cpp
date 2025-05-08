@@ -17,15 +17,7 @@ using namespace mt;
 
 namespace {
 
-int64_t vectorAddressStartId = 0;
-int64_t vectorAddressEndId = 7;
-int64_t scalarAddressStartId = 10;
-int64_t scalarAddressEndId = 16;
-
 void implAllocateAddressRegisters(func::FuncOp funcOp) {
-    int64_t scalarAddressRegisterIdx = scalarAddressStartId;
-    int64_t vectorAddressRegisterIdx = vectorAddressStartId;
-
     auto ctx = funcOp.getContext();
     OpBuilder builder(ctx);
     OpBuilder::InsertionGuard guard(builder);
@@ -49,26 +41,12 @@ void implAllocateAddressRegisters(func::FuncOp funcOp) {
             
             ftm::DeclareRegisterOp declareAR = 
                 builder.create<ftm::DeclareRegisterOp>(funcOp.getLoc(), LLVM::LLVMPointerType::get(ctx));
-            declareAR->setAttr(ftm::MemLevelAttr::name, 
-                ftm::MemLevelAttr::get(ctx, ftm::Cache::AddressRegister));
-            // 如果ftm.memory_level属性为sm
             if(memLevel == ftm::Cache::SM) {
-                if(scalarAddressRegisterIdx >= scalarAddressEndId) {
-                    // 如果超过了AR的容量，报错
-                    llvm::errs() << "scalar address register index out of range\n";
-                    return;
-                }
-                // 为其分配一个ftm.address_register，编号为scalarAddressRegisterIdx
-                declareAR->setAttr(ftm::RegisterIdAttr::name, 
-                    ftm::RegisterIdAttr::get(ctx, scalarAddressRegisterIdx++));
+                declareAR->setAttr(ftm::MemLevelAttr::name, 
+                    ftm::MemLevelAttr::get(ctx, ftm::Cache::ScalarAddressRegister));
             } else if(memLevel == ftm::Cache::AM) {
-                // 与sm的处理类似
-                if(vectorAddressRegisterIdx >= vectorAddressEndId) {
-                    llvm::errs() << "vector address register index out of range\n";
-                    return;
-                }
-                declareAR->setAttr(ftm::RegisterIdAttr::name, 
-                    ftm::RegisterIdAttr::get(ctx, vectorAddressRegisterIdx++));
+                declareAR->setAttr(ftm::MemLevelAttr::name, 
+                    ftm::MemLevelAttr::get(ctx, ftm::Cache::VectorAddressRegister));
             }
             // 替换所有对该参数的使用为对ftm.address_register的使用
             arg.replaceAllUsesWith(declareAR);

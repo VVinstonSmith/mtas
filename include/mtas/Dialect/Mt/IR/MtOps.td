@@ -27,7 +27,7 @@ class Mt_Op<string mnemonic, list<Trait> traits = []> :
   ])>;
 
 def Mt_DeclareRegisterOp: 
-  Op<Mt_Dialect, "declare_register", [Pure]>,
+  Op<Mt_Dialect, "declare_register">,
   Results<(outs AnyType:$output)> {
   let summary = "declare register operation";
   let assemblyFormat = "attr-dict `:` type($output)";

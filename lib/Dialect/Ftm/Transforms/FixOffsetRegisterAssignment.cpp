@@ -35,7 +35,7 @@ bool isOffsetRegister(Value reg) {
     if (auto declareOp = dyn_cast<ftm::DeclareRegisterOp>(defOp)) {
       if (auto attr = defOp->getAttr(ftm::MemLevelAttr::name)) {
         auto memLevel = attr.cast<ftm::MemLevelAttr>().getLevel();
-        return memLevel == ftm::Cache::OffsetRegister;
+        return isOffsetRegister(memLevel);
       }
     }
   }

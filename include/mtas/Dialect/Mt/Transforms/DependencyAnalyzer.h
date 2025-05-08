@@ -45,7 +45,7 @@ public:
   const DependencyGraph &getDependencyGraph() const;
 
   // 按照区域中操作的顺序输出依赖关系
-  void printDependenciesInOrder(raw_ostream &os = llvm::errs()) const;
+  void printDependenciesInOrder(raw_ostream &os = llvm::outs()) const;
 
 private:
   // 被分析的区域

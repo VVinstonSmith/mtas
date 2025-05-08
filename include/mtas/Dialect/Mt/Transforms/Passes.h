@@ -49,6 +49,9 @@ std::unique_ptr<Pass> createReduce80BitInstructionsPass();
 /// Create a pass to generate condition checking and labels for for loops
 std::unique_ptr<Pass> createGenerateConditionAndLabelsForLoopsPass();
 
+/// Create a pass to assign unique IDs to registers
+std::unique_ptr<Pass> createAssignRegisterIdsPass();
+
 /// Create a pass to perform instruction scheduling and packing
 std::unique_ptr<Pass> createInstructionSchedulingAndPackingPass();
 

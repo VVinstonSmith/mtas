@@ -45,6 +45,7 @@
     -cse -canonicalize -cse  \
     -generate-condition-and-labels-for-loops  \
     -cse -canonicalize -cse  \
+    -assign-register-ids \
     -instruction-scheduling-and-packing  \
     -cse -canonicalize -cse  \
     > ../build/debug_output.log 2>&1

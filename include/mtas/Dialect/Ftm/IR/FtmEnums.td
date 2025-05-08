@@ -60,14 +60,19 @@ def CacheDDR : I64EnumAttrCase<"DDR", 1, "ddr">;
 def CacheGSM : I64EnumAttrCase<"GSM", 2, "gsm">;
 def CacheAM : I64EnumAttrCase<"AM", 3, "am">;
 def CacheSM : I64EnumAttrCase<"SM", 4, "sm">;
-def ScalarRegister : I64EnumAttrCase<"ScalarRegister", 5, "scalar_register">;
-def VectorRegister : I64EnumAttrCase<"VectorRegister", 6, "vector_register">;
-def AddressRegister : I64EnumAttrCase<"AddressRegister", 7, "address_register">;
-def OffsetRegister : I64EnumAttrCase<"OffsetRegister", 8, "offset_register">;
+def VectorRegister : I64EnumAttrCase<"VectorRegister", 5, "vector_register">;
+def ScalarRegister : I64EnumAttrCase<"ScalarRegister", 6, "scalar_register">;
+def VectorAddressRegister : I64EnumAttrCase<"VectorAddressRegister", 7, "vector_address_register">;
+def ScalarAddressRegister : I64EnumAttrCase<"ScalarAddressRegister", 8, "scalar_address_register">;
+def VectorOffsetRegister : I64EnumAttrCase<"VectorOffsetRegister", 9, "vector_offset_register">;
+def ScalarOffsetRegister : I64EnumAttrCase<"ScalarOffsetRegister", 10, "scalar_offset_register">;
+def ScalarConditionRegister : I64EnumAttrCase<"ScalarConditionRegister", 11, "scalar_condition_register">;
 
 def Ftm_CacheEnum : I64EnumAttr<"Cache", "cache", [
     Unknown, CacheDDR, CacheGSM, CacheAM, CacheSM,
-    ScalarRegister, VectorRegister, AddressRegister, OffsetRegister]> {
+    VectorRegister, ScalarRegister, 
+    VectorAddressRegister, ScalarAddressRegister, VectorOffsetRegister, ScalarOffsetRegister, 
+    ScalarConditionRegister]> {
   let cppNamespace = "::mlir::ftm";
 }
 

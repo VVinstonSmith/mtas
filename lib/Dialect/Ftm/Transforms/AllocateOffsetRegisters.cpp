@@ -31,11 +31,6 @@ using namespace mlir::ftm;
 
 namespace {
 
-int64_t vectorOffsetStartId = 0;
-int64_t vectorOffsetEndId = 8;
-int64_t scalarOffsetStartId = 8;
-int64_t scalarOffsetEndId = 16;
-
 // 可能需要返回一个结构体，包含SmoviOp和对应的DeclareRegisterOp
 struct RegisterInfo {
   ftm::SmoviOp smoviOp;
@@ -50,18 +45,12 @@ RegisterInfo scanOffsetRegisterInitializerWith(
       if(auto declareOp = dyn_cast<ftm::DeclareRegisterOp>(defOp)) {
         auto regMemLevel = declareOp->getAttr(
             ftm::MemLevelAttr::name).cast<ftm::MemLevelAttr>().getLevel();
-        auto registerId = declareOp->getAttr(
-            ftm::RegisterIdAttr::name).cast<ftm::RegisterIdAttr>().getId();
-        if(regMemLevel != ftm::Cache::OffsetRegister || smoviOp.getImm() != value)
+        if(!ftm::isOffsetRegister(regMemLevel) || 
+            smoviOp.getImm() != value)
           return WalkResult::skip();
-        if((memLevel == ftm::Cache::AM && 
-              registerId >= vectorOffsetStartId && registerId < vectorOffsetEndId) ||
-           (memLevel == ftm::Cache::SM && 
-              registerId >= scalarOffsetStartId && registerId < scalarOffsetEndId)) {
-          result.smoviOp = smoviOp;
-          result.declareOp = declareOp;
-          return WalkResult::interrupt();
-        }
+        result.smoviOp = smoviOp;
+        result.declareOp = declareOp;
+        return WalkResult::interrupt();
       }
     }
     return WalkResult::advance();
@@ -107,8 +96,7 @@ ftm::Cache analyzeTipConstantAddOp(arith::AddIOp addiOp) {
   return memLevel;
 }
 
-bool implOffsetRegisterAllocating(arith::AddIOp addiOp, ftm::Cache memLevel,
-    int64_t& scalarOffsetRegisterIdx, int64_t& vectorOffsetRegisterIdx) {
+bool implOffsetRegisterAllocating(arith::AddIOp addiOp, ftm::Cache memLevel) {
   auto loc = addiOp.getLoc();
   auto ctx = addiOp.getContext();
   OpBuilder builder(ctx);
@@ -123,26 +111,18 @@ bool implOffsetRegisterAllocating(arith::AddIOp addiOp, ftm::Cache memLevel,
   // 如果使用立即数偏移，则不需要申请偏移寄存器
   ftm::DeclareRegisterOp declareOR;
   if (!useImmOffset) {
-    // 检查是否存在可重用的偏移寄存器
-    if(memLevel == ftm::Cache::SM && scalarOffsetRegisterIdx >= scalarOffsetEndId)
-      return false;
-    if(memLevel == ftm::Cache::AM && vectorOffsetRegisterIdx >= vectorOffsetEndId)
-      return false;
-      
     RegisterInfo regInfo = scanOffsetRegisterInitializerWith(funcOp, memLevel, imm);
     
     if(!regInfo.smoviOp) {
       OpBuilder::InsertionGuard guard(builder);
       builder.setInsertionPointToStart(&funcOp.getBody().front());
       declareOR = builder.create<ftm::DeclareRegisterOp>(loc, builder.getI64Type());
-      declareOR->setAttr(ftm::MemLevelAttr::name,
-          ftm::MemLevelAttr::get(ctx, ftm::Cache::OffsetRegister));
       if(memLevel == ftm::Cache::SM) {
-        declareOR->setAttr(ftm::RegisterIdAttr::name, 
-            ftm::RegisterIdAttr::get(ctx, scalarOffsetRegisterIdx++));
+        declareOR->setAttr(ftm::MemLevelAttr::name,
+            ftm::MemLevelAttr::get(ctx, ftm::Cache::ScalarOffsetRegister));
       } else if(memLevel == ftm::Cache::AM) {
-        declareOR->setAttr(ftm::RegisterIdAttr::name, 
-          ftm::RegisterIdAttr::get(ctx, vectorOffsetRegisterIdx++));
+        declareOR->setAttr(ftm::MemLevelAttr::name,
+            ftm::MemLevelAttr::get(ctx, ftm::Cache::VectorOffsetRegister));
       }
       builder.create<ftm::SmoviOp>(loc,
           builder.getI64IntegerAttr(imm), declareOR);
@@ -203,13 +183,10 @@ class AllocateOffsetRegistersPass :
 public:
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
-    int64_t scalarOffsetRegisterIdx = scalarOffsetStartId;
-    int64_t vectorOffsetRegisterIdx = vectorOffsetStartId;
     funcOp.walk([&](arith::AddIOp addiOp) {
       auto memLevel = analyzeTipConstantAddOp(addiOp);
       if(memLevel != ftm::Cache::Unknown)
-        implOffsetRegisterAllocating(addiOp, memLevel,
-            scalarOffsetRegisterIdx, vectorOffsetRegisterIdx);
+        implOffsetRegisterAllocating(addiOp, memLevel);
       return WalkResult::advance();
     });
   }

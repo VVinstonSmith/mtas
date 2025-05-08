@@ -1,4 +1,5 @@
 {
+  "C_Cpp.clang_format_style": "{ BasedOnStyle: Google, BraceWrapping: { AfterFunction: false, AfterClass: false, AfterControlStatement: false, AfterEnum: false, AfterNamespace: false, AfterStruct: false, AfterUnion: false }, BreakBeforeBraces: Attach }",
   "files.associations": {
     "array": "cpp",
     "atomic": "cpp",
@@ -69,6 +70,9 @@
     "__nullptr": "cpp",
     "__functional_03": "cpp",
     "target": "cpp",
-    "iomanip": "cpp"
+    "iomanip": "cpp",
+    "__hash_table": "cpp",
+    "__tree": "cpp",
+    "__bit_reference": "cpp"
   }
 }

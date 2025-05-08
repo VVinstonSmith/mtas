@@ -52,9 +52,7 @@ private:
         builder.setInsertionPointToStart(&funcOp.getBody().front());
         mt::DeclareRegisterOp regOp = builder.create<mt::DeclareRegisterOp>(forOp.getLoc(), builder.getI64Type());
         regOp->setAttr(ftm::MemLevelAttr::name, 
-            ftm::MemLevelAttr::get(builder.getContext(), ftm::Cache::ScalarRegister));
-        regOp->setAttr(ftm::RegisterIdAttr::name, 
-            ftm::RegisterIdAttr::get(builder.getContext(), 0));
+            ftm::MemLevelAttr::get(builder.getContext(), ftm::Cache::ScalarConditionRegister));
         // 在循环的结束插入：
         //     SADD将下界的寄存器加上步长寄存器
         //     SLT判断下界寄存器是否小于上界寄存器

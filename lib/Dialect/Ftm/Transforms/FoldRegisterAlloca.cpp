@@ -36,93 +36,97 @@ DenseMap<ftm::Cache, int64_t> unitLengthOf = {
 };
 
 LLVM::AllocaOp searchAllocaFromPtr(Value ptr) {
+  // 检查值是否由操作定义
   if(auto defOp = ptr.getDefiningOp()) {
+    // 如果是GEP操作，则递归检查基址指针
     if(auto gepOp = dyn_cast<LLVM::GEPOp>(defOp)) {
       return searchAllocaFromPtr(gepOp.getBase());
     } else if(auto allocaOp = dyn_cast<LLVM::AllocaOp>(defOp)) {
+      // 如果是Alloca操作，则直接返回
       return allocaOp;
     }
   }
+  // 如果不是由操作定义，或者不是GEP或Alloca操作，则返回nullptr
   return nullptr;
 }
 
-DenseSet<unsigned> scanAllocatedRegisters(func::FuncOp funcOp, ftm::Cache memLevel) {
-  DenseSet<unsigned> allocated;
-  funcOp.walk([&](ftm::DeclareRegisterOp op) {
-    if(auto attr = op->getAttr(ftm::MemLevelAttr::name)) {
-      if(attr.cast<ftm::MemLevelAttr>().getLevel() != memLevel)
-        return WalkResult::skip();
-    } else return WalkResult::skip();
-    if(auto attr = op->getAttr(ftm::RegisterIdAttr::name)) {
-      unsigned id = attr.cast<ftm::RegisterIdAttr>().getId();
-      allocated.insert(id);
-    }
-    return WalkResult::advance();
-  });
-  return allocated;
-}
-
-void implRegisterFolding(LLVM::AllocaOp allocaOp) {
+void implRegisterFolding(LLVM::AllocaOp allocaOp, 
+                        DenseMap<std::pair<Value, int64_t>, Value>& memToRegMap) {
   auto loc = allocaOp.getLoc();
   auto ctx = allocaOp.getContext();
   OpBuilder builder(ctx);
 
+  // 获取内存级别属性
   auto memLevelAttr = allocaOp->getAttr(ftm::MemLevelAttr::name);
+  if (!memLevelAttr) {
+    llvm::errs() << "alloca must have memory level attr\n";
+    return;
+  }
+  
   ftm::Cache memLevel = memLevelAttr.cast<ftm::MemLevelAttr>().getLevel();
 
-  if(!unitLengthOf.count(memLevel)) {
-    llvm::errs() << "memory level must be scalar/vector regist\n";
+  // 验证内存级别是否为寄存器
+  if (!unitLengthOf.count(memLevel)) {
+    llvm::errs() << "memory level must be scalar/vector register\n";
     return;
   }
   int64_t elemSize = unitLengthOf.at(memLevel);
 
+  // 计算需要的寄存器数量
   int64_t n_regs = 0;
-  if(auto defOp = allocaOp.getArraySize().getDefiningOp()) {
-    if(auto constOp = dyn_cast<LLVM::ConstantOp>(defOp)) {
+  if (auto defOp = allocaOp.getArraySize().getDefiningOp()) {
+    if (auto constOp = dyn_cast<LLVM::ConstantOp>(defOp)) {
       n_regs = constOp.getValue().cast<IntegerAttr>().getInt() / elemSize;
     }
   }
-  if(n_regs == 0)
+  if (n_regs == 0)
     return;
 
-  DenseSet<unsigned> allocatedIds = scanAllocatedRegisters(
-      allocaOp->getParentOfType<func::FuncOp>(), memLevel); 
-
+  // 设置插入点 - 在AllocaOp之后
   OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPointAfter(allocaOp);
 
-  SmallVector<unsigned> registerIndices;
+  // 获取输出类型
   Type outputType = VectorType::get({elemSize}, builder.getF32Type());
 
-  for(int64_t idx = 0; n_regs != 0 ; idx++) {
-    if(allocatedIds.count(idx))
-      continue;
+  // 为每个需要的寄存器创建声明
+  for (int64_t i = 0; i < n_regs; i++) {
     auto declareOp = builder.create<ftm::DeclareRegisterOp>(loc, outputType);
     declareOp->setAttr(ftm::MemLevelAttr::name, memLevelAttr);
-    declareOp->setAttr(ftm::RegisterIdAttr::name,
-        ftm::RegisterIdAttr::get(ctx, idx)); 
-    registerIndices.push_back(idx);
-    n_regs--;
+    
+    // 计算偏移量
+    int64_t offset = i * elemSize;
+    
+    // 创建键值对：(分配操作, 偏移量) -> 寄存器值
+    auto key = std::make_pair(allocaOp.getResult(), offset);
+    memToRegMap[key] = declareOp.getResult();
   }
-  allocaOp->setAttr(ftm::RegisterIndicesAttr::name,
-      ftm::RegisterIndicesAttr::get(ctx, registerIndices));
 }
 
 std::pair<LLVM::AllocaOp, int64_t>
 searchAllocaAndOffsetFromPtr(Value ptr) {
   auto defOp = ptr.getDefiningOp();
+  
+  // 验证输入是否有效
   if(!defOp || 
       (!isa<LLVM::AllocaOp>(defOp) && !isa<LLVM::GEPOp>(defOp))) {
     llvm::errs() << "addr must be defined by alloca or gep\n";
     return {};
   }
+  
+  // 如果是Alloca操作，偏移量为0
   if(auto alloca = dyn_cast<LLVM::AllocaOp>(defOp)) {
     return {alloca, 0};
   }
+  
+  // 如果是GEP操作，需要计算偏移量
   if(auto gep = dyn_cast<LLVM::GEPOp>(defOp)) {
+    // 检查索引是否为常量
     if(auto attr = gep.getIndices()[0].dyn_cast<IntegerAttr>()) {
+      // 递归检查基址指针并获取累积偏移量
       auto [alloca, offset] = searchAllocaAndOffsetFromPtr(gep.getBase());
       if(alloca) {
+        // 返回分配操作和累积偏移量
         return {alloca, offset + attr.getInt()};
       }
     } else {
@@ -130,82 +134,90 @@ searchAllocaAndOffsetFromPtr(Value ptr) {
       return {};
     }
   }
+  
+  // 其他情况返回空
   return {};
 }
 
-Value searchRegisterDeclareWith(
-    func::FuncOp funcOp, Attribute memLevelAttr, int64_t registerId) {
-  Value declareRegisterValue;
-  funcOp.walk([&](ftm::DeclareRegisterOp op) {
-    if(auto memLevelAttr_1 = op->getAttr(ftm::MemLevelAttr::name)) {
-      if(memLevelAttr_1 != memLevelAttr)
-        return WalkResult::skip();
-      if(auto attr = op->getAttr(ftm::RegisterIdAttr::name)) {
-        int64_t regId = attr.cast<ftm::RegisterIdAttr>().getId();
-        if(regId == registerId) {
-          declareRegisterValue = op.getResult();
-          return WalkResult::interrupt();
-        }
-      }
-    }
-    return WalkResult::advance();
-  });
-  if(!declareRegisterValue) {
-    llvm::errs() << "fail to find correct register declaration.\n";
-    return nullptr;
-  }
-  return declareRegisterValue;
-}
-
-bool replaceLoadAndStoreWithRegister(Operation* op) {
+bool replaceLoadAndStoreWithRegister(
+    Operation* op, 
+    DenseMap<std::pair<Value, int64_t>, Value>& memToRegMap) {
   auto loc = op->getLoc();
   auto ctx = op->getContext();
   OpBuilder builder(ctx);
 
+  // 获取内存地址
   Value addr;
-  if(auto loadOp = dyn_cast<ftm::LoadOp>(op)) {
+  if (auto loadOp = dyn_cast<ftm::LoadOp>(op)) {
     addr = loadOp.getAddr();
-  } else if(auto storeOp = dyn_cast<ftm::StoreOp>(op)) {
+  } else if (auto storeOp = dyn_cast<ftm::StoreOp>(op)) {
     addr = storeOp.getAddr();
-  } else
-    return false;
-  auto [alloca, offset] = searchAllocaAndOffsetFromPtr(addr);
-  if(!alloca)
-    return false;
-  auto memLevelAttr = alloca->getAttr(ftm::MemLevelAttr::name);
-  if(!memLevelAttr) {
-    llvm::errs() << "alloca must have memory level attr\n";
+  } else {
+    // 不是load或store操作，直接返回
     return false;
   }
-  ftm::Cache memLevel = memLevelAttr.cast<ftm::MemLevelAttr>().getLevel();
-  auto registerIndices = alloca->getAttr(
-      ftm::RegisterIndicesAttr::name).cast<ftm::RegisterIndicesAttr>().getIndices();
-  auto funcOp = op->getParentOfType<func::FuncOp>();
-  auto regDecVal = searchRegisterDeclareWith(
-      funcOp, memLevelAttr, registerIndices[offset / unitLengthOf.at(memLevel)]);
-  if(!regDecVal)
+  
+  // 查找分配操作和偏移量
+  auto [alloca, offset] = searchAllocaAndOffsetFromPtr(addr);
+  if (!alloca) {
+    // 无法找到分配操作，返回
     return false;
-  if(auto loadOp = dyn_cast<ftm::LoadOp>(op)) {
-    loadOp.getResult().replaceAllUsesWith(regDecVal);
+  }
+  
+  // 检查内存级别属性
+  auto memLevelAttr = op->getAttr(ftm::MemLevelAttr::name);
+  if (!memLevelAttr) {
+    llvm::errs() << "operation must have memory level attr\n";
+    return false;
+  }
+  
+  ftm::Cache memLevel = memLevelAttr.cast<ftm::MemLevelAttr>().getLevel();
+  if (memLevel != ftm::Cache::ScalarRegister && 
+      memLevel != ftm::Cache::VectorRegister) {
+    // 非寄存器内存级别，返回
+    return false;
+  }
+  
+  // 查找内存位置对应的寄存器值
+  auto key = std::make_pair(alloca.getResult(), offset);
+  if (!memToRegMap.count(key)) {
+    llvm::errs() << "cannot find register for memory location\n";
+    return false;
+  }
+  
+  Value regValue = memToRegMap[key];
+  
+  // 根据操作类型处理
+  if (auto loadOp = dyn_cast<ftm::LoadOp>(op)) {
+    // 对于加载操作，直接用寄存器值替换所有使用
+    loadOp.getResult().replaceAllUsesWith(regValue);
     loadOp.erase();
-  } else if(auto storeOp = dyn_cast<ftm::StoreOp>(op)) {
+    return true;
+  } else if (auto storeOp = dyn_cast<ftm::StoreOp>(op)) {
+    // 对于存储操作，需要处理更复杂的情况
     auto defOp = storeOp.getValue().getDefiningOp();
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPointAfter(defOp);
-    if(auto fma = dyn_cast<ftm::FMAOp>(defOp)) {
-      auto vfmaOp = builder.create<ftm::VFMAOp>(loc,
-          fma.getLhs(), fma.getRhs(), fma.getAcc(), regDecVal);
-      // 复制原FMAOp的所有属性到新创建的VFMAOp
+    if (auto fma = dyn_cast<ftm::FMAOp>(defOp)) {
+      // 如果是FMA操作，则创建VFMA操作
+      auto vfmaOp = builder.create<ftm::VFMAOp>(
+          loc,
+          fma.getLhs(), fma.getRhs(), fma.getAcc(), regValue);
+      // 复制原FMA操作的所有属性
       for (auto namedAttr : fma->getAttrs()) {
         vfmaOp->setAttr(namedAttr.getName(), namedAttr.getValue());
       }
     }
-    //  else if(auto movi = dyn_cast<ftm::MoviOp>(defOp)) {
-    //   builder.create<ftm::VmoviOp>(loc, movi.getImm(), movi.getReg());
+    // else if (auto movi = dyn_cast<ftm::MoviOp>(defOp)) {
+    //   builder.create<ftm::VmoviOp>(
+    //       loc, movi.getImm(), regValue);
     // }
+    // 删除原Store操作
     storeOp.erase();
+    return true;
   }
-  return true;
+  
+  return false;
 }
 
 } // namepsace
@@ -216,29 +228,43 @@ class FoldRegisterAllocaPass :
 public:
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
+    
+    // 用于存储内存位置到寄存器值的映射
+    DenseMap<std::pair<Value, int64_t>, Value> memToRegMap;
+    
+    // 第一步：将内存级别属性从加载操作传播到分配操作
     funcOp.walk([&](ftm::LoadOp op) {
-      if(auto attr = op->getAttr(ftm::MemLevelAttr::name)) {
-        if(auto alloca = searchAllocaFromPtr(op.getAddr())) {
+      if (auto attr = op->getAttr(ftm::MemLevelAttr::name)) {
+        if (auto alloca = searchAllocaFromPtr(op.getAddr())) {
           alloca->setAttr(ftm::MemLevelAttr::name, attr);
         }
       }
       return WalkResult::advance();
     });
+    
+    // 第二步：收集所有需要处理的分配操作并执行寄存器折叠
+    SmallVector<LLVM::AllocaOp, 8> allocaOps;
     funcOp.walk([&](LLVM::AllocaOp op) {
-      if(op->getAttr(ftm::RegisterIndicesAttr::name))
-        return WalkResult::skip();
-      if(auto attr = op->getAttr(ftm::MemLevelAttr::name)) 
-        implRegisterFolding(op);
+      if (auto attr = op->getAttr(ftm::MemLevelAttr::name)) {
+        allocaOps.push_back(op);
+      }
       return WalkResult::advance();
     });
+    // 对收集到的分配操作执行寄存器折叠
+    for (auto op : allocaOps) {
+      implRegisterFolding(op, memToRegMap);
+    }
+    
+    // 第三步：将加载/存储操作替换为直接寄存器访问
     funcOp.walk([&](Operation *op) {
-      if(!isa<ftm::LoadOp>(op) && !isa<ftm::StoreOp>(op))
+      if (!isa<ftm::LoadOp>(op) && !isa<ftm::StoreOp>(op))
         return WalkResult::skip();
-      if(auto attr = op->getAttr(ftm::MemLevelAttr::name)) {
+        
+      if (auto attr = op->getAttr(ftm::MemLevelAttr::name)) {
         auto memLevel = attr.cast<ftm::MemLevelAttr>().getLevel();
-        if(memLevel == ftm::Cache::ScalarRegister ||
+        if (memLevel == ftm::Cache::ScalarRegister ||
             memLevel == ftm::Cache::VectorRegister) {
-          replaceLoadAndStoreWithRegister(op);
+          replaceLoadAndStoreWithRegister(op, memToRegMap);
         }
       }
       return WalkResult::advance();
