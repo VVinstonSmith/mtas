@@ -48,6 +48,8 @@ public:
   
   // 格式化特殊操作数（如带偏移的访存指令）
   static std::string formatMemoryOperand(Value base, Value offset = nullptr);
+
+  static std::string formatMemoryOperandWithImm(Value base, int64_t immOffset);
 };
 
 } // namespace mt

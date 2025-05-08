@@ -101,6 +101,36 @@ def Mt_VstwOp :
   let hasCustomAssemblyFormat = 1;
 }
 
+def Mt_SldwiOp :
+  Mt_Op<"SLDWI", [
+  ]>,
+  Arguments<(ins LLVM_AnyPointer:$base,
+                 VectorOfLengthAndType<[2], [F32]>:$dst,
+                 I64Attr:$immOffset)> {
+  let summary = "scalar load word with immediate offset operation";
+  let hasCustomAssemblyFormat = 1;
+}
+
+def Mt_VldwiOp :
+  Mt_Op<"VLDWI", [
+  ]>,
+  Arguments<(ins LLVM_AnyPointer:$base,
+                 VectorOfLengthAndType<[32], [F32]>:$dst,
+                 I64Attr:$immOffset)> {
+  let summary = "vector load word with immediate offset operation";
+  let hasCustomAssemblyFormat = 1;
+}
+
+def Mt_VstwiOp :
+  Mt_Op<"VSTWI", [
+  ]>,
+  Arguments<(ins VectorOfLengthAndType<[32], [F32]>:$src,
+                 LLVM_AnyPointer:$base,
+                 I64Attr:$immOffset)> {
+  let summary = "vector store word with immediate offset operation";
+  let hasCustomAssemblyFormat = 1;
+}
+
 def Mt_SvbcastOp :
   Mt_Op<"SVBCAST", [
   ]>,

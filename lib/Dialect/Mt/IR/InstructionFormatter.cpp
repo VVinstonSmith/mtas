@@ -155,3 +155,27 @@ std::string InstructionFormatter::formatMemoryOperand(Value base, Value offset) 
   
   return os.str();
 }
+
+std::string InstructionFormatter::formatMemoryOperandWithImm(Value base, int64_t immOffset) {
+  std::string result;
+  llvm::raw_string_ostream os(result);
+  
+  // 添加内存访问符号"*"
+  os << "*";
+  
+  // 检查是否有立即数偏移量
+  if (immOffset != 0) {
+    // 有偏移量，添加"+"符号
+    os << "+";
+  }
+  
+  // 添加基址寄存器
+  os << formatRegisterName(base);
+  
+  // 如果有立即数偏移量，添加立即数
+  if (immOffset != 0) {
+    os << "[" << immOffset << "]";
+  }
+  
+  return os.str();
+}

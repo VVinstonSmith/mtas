@@ -247,6 +247,74 @@ public:
   }
 };
 
+class FtmLoadImmOpToMtLdwiOp : public FtmToMtOpConversion<ftm::LoadImmOp> {
+public:
+  using FtmToMtOpConversion<ftm::LoadImmOp>::FtmToMtOpConversion;
+
+  LogicalResult
+  matchAndRewrite(ftm::LoadImmOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    Value base = adaptor.getAddr();
+    int64_t immOffset = adaptor.getImmOffset();
+
+    auto memLevelAttr = op->getAttr(ftm::MemLevelAttr::name);
+    ftm::Cache memLevel = memLevelAttr.cast<ftm::MemLevelAttr>().getLevel();
+
+    // 根据内存级别确定寄存器类型
+    ftm::Cache regType = (memLevel == ftm::Cache::SM) ? 
+                          ftm::Cache::ScalarRegister : 
+                          ftm::Cache::VectorRegister;
+    
+    // 使用辅助方法创建寄存器并替换原操作
+    Value dst = createRegisterAndReplace(op, op.getType(), regType, rewriter);
+
+    // 根据内存级别创建不同的立即数操作
+    if (regType == ftm::Cache::ScalarRegister) {
+      // 创建SldwiOp - 使用立即数偏移
+      rewriter.create<mt::SldwiOp>(op.getLoc(), base, dst, immOffset);
+    } else {
+      // 创建VldwiOp - 使用立即数偏移
+      rewriter.create<mt::VldwiOp>(op.getLoc(), base, dst, immOffset);
+    }
+    
+    return success();
+  }
+};
+
+class FtmStoreImmOpToMtStwiOp : public FtmToMtOpConversion<ftm::StoreImmOp> {
+public:
+  using FtmToMtOpConversion<ftm::StoreImmOp>::FtmToMtOpConversion;
+
+  LogicalResult
+  matchAndRewrite(ftm::StoreImmOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    Value value = adaptor.getValue();
+    Value base = adaptor.getAddr();
+    int64_t immOffset = adaptor.getImmOffset();
+
+    auto memLevelAttr = op->getAttr(ftm::MemLevelAttr::name);
+    ftm::Cache memLevel = memLevelAttr.cast<ftm::MemLevelAttr>().getLevel();
+
+    // 根据内存级别确定寄存器类型
+    ftm::Cache regType = (memLevel == ftm::Cache::SM) ? 
+                          ftm::Cache::ScalarRegister : 
+                          ftm::Cache::VectorRegister;
+    
+    // 根据内存级别创建不同的立即数操作
+    if (regType == ftm::Cache::ScalarRegister) {
+      // 创建SstwiOp - 目前没有实现
+      // rewriter.create<mt::SstwiOp>(op.getLoc(), value, base, immOffset);
+    } else {
+      // 创建VstwiOp - 使用立即数偏移
+      rewriter.create<mt::VstwiOp>(op.getLoc(), value, base, immOffset);
+    }
+    
+    rewriter.eraseOp(op);
+    
+    return success();
+  }
+};
+
 class FtmBroadcastOpToMtSvbcastOp : public FtmToMtOpConversion<ftm::BroadcastOp> {
 public:
   using FtmToMtOpConversion<ftm::BroadcastOp>::FtmToMtOpConversion;
@@ -451,6 +519,8 @@ public:
     target.addIllegalOp<LLVM::ConstantOp>();
     target.addIllegalOp<ftm::LoadOp>();
     target.addIllegalOp<ftm::StoreOp>();
+    target.addIllegalOp<ftm::LoadImmOp>();
+    target.addIllegalOp<ftm::StoreImmOp>();
     target.addIllegalOp<ftm::BroadcastOp>();
     target.addIllegalOp<ftm::Vbale2lOp>();
     target.addIllegalOp<ftm::Vbale2hOp>();
@@ -477,6 +547,8 @@ public:
         LLVMConstantOpToMtSmoviOp,
         FtmLoadOpToMtLdwOp,
         FtmStoreOpToMtStwOp,
+        FtmLoadImmOpToMtLdwiOp,
+        FtmStoreImmOpToMtStwiOp,
         FtmBroadcastOpToMtSvbcastOp,
         FtmVbale2lOpToMtVbale2Op,
         FtmVbale2hOpToMtVbale2hOp,

@@ -179,6 +179,30 @@ def Ftm_StoreOp : Ftm_Op<"store"> {
   }];
 }
 
+def Ftm_LoadImmOp : Ftm_Op<"load_imm", [Pure]> {
+  let arguments = (ins LLVM_AnyPointer:$addr, I64Attr:$immOffset);
+  let results = (outs LLVM_LoadableType:$res);
+  let assemblyFormat = [{
+    $addr `[` $immOffset `]` attr-dict `:` qualified(type($addr)) `->` type($res)
+  }];
+}
+
+def Ftm_StoreImmOp : Ftm_Op<"store_imm"> {
+  let arguments = (ins LLVM_LoadableType:$value,
+                      LLVM_AnyPointer:$addr, I64Attr:$immOffset);
+  let assemblyFormat = [{
+    $value `,` $addr `[` $immOffset `]` attr-dict `:` type($value) `,` qualified(type($addr))
+  }];
+  let extraClassDeclaration = [{
+    void getEffects(
+        SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>> &
+        effects) {
+      effects.emplace_back(MemoryEffects::Write::get(), getAddr(),
+                           SideEffects::DefaultResource::get());
+    }
+  }];
+}
+
 def Ftm_CastOp:
   Ftm_Op<"cast", [Pure]>,
     Arguments<(ins AnyType:$source)>,

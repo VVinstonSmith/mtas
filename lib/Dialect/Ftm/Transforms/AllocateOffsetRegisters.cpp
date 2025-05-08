@@ -109,11 +109,6 @@ ftm::Cache analyzeTipConstantAddOp(arith::AddIOp addiOp) {
 
 bool implOffsetRegisterAllocating(arith::AddIOp addiOp, ftm::Cache memLevel,
     int64_t& scalarOffsetRegisterIdx, int64_t& vectorOffsetRegisterIdx) {
-  if(memLevel == ftm::Cache::SM && scalarOffsetRegisterIdx >= scalarOffsetEndId)
-    return false;
-  if(memLevel == ftm::Cache::AM && vectorOffsetRegisterIdx >= vectorOffsetEndId)
-    return false;
-
   auto loc = addiOp.getLoc();
   auto ctx = addiOp.getContext();
   OpBuilder builder(ctx);
@@ -122,26 +117,38 @@ bool implOffsetRegisterAllocating(arith::AddIOp addiOp, ftm::Cache memLevel,
   int64_t constInt = constOp.getValue().cast<IntegerAttr>().getInt();
   int64_t imm = constInt / 8; // 以字为单位
   
-  RegisterInfo regInfo = scanOffsetRegisterInitializerWith(funcOp, memLevel, imm);
-  ftm::DeclareRegisterOp declareOR;
+  // 检查偏移量的绝对值是否小于1024
+  bool useImmOffset = std::abs(imm) < 1024;
   
-  if(!regInfo.smoviOp) {
-    OpBuilder::InsertionGuard guard(builder);
-    builder.setInsertionPointToStart(&funcOp.getBody().front());
-    declareOR = builder.create<ftm::DeclareRegisterOp>(loc, builder.getI64Type());
-    declareOR->setAttr(ftm::MemLevelAttr::name,
-        ftm::MemLevelAttr::get(ctx, ftm::Cache::OffsetRegister));
-    if(memLevel == ftm::Cache::SM) {
-      declareOR->setAttr(ftm::RegisterIdAttr::name, 
-          ftm::RegisterIdAttr::get(ctx, scalarOffsetRegisterIdx++));
-    } else if(memLevel == ftm::Cache::AM) {
-      declareOR->setAttr(ftm::RegisterIdAttr::name, 
-        ftm::RegisterIdAttr::get(ctx, vectorOffsetRegisterIdx++));
+  // 如果使用立即数偏移，则不需要申请偏移寄存器
+  ftm::DeclareRegisterOp declareOR;
+  if (!useImmOffset) {
+    // 检查是否存在可重用的偏移寄存器
+    if(memLevel == ftm::Cache::SM && scalarOffsetRegisterIdx >= scalarOffsetEndId)
+      return false;
+    if(memLevel == ftm::Cache::AM && vectorOffsetRegisterIdx >= vectorOffsetEndId)
+      return false;
+      
+    RegisterInfo regInfo = scanOffsetRegisterInitializerWith(funcOp, memLevel, imm);
+    
+    if(!regInfo.smoviOp) {
+      OpBuilder::InsertionGuard guard(builder);
+      builder.setInsertionPointToStart(&funcOp.getBody().front());
+      declareOR = builder.create<ftm::DeclareRegisterOp>(loc, builder.getI64Type());
+      declareOR->setAttr(ftm::MemLevelAttr::name,
+          ftm::MemLevelAttr::get(ctx, ftm::Cache::OffsetRegister));
+      if(memLevel == ftm::Cache::SM) {
+        declareOR->setAttr(ftm::RegisterIdAttr::name, 
+            ftm::RegisterIdAttr::get(ctx, scalarOffsetRegisterIdx++));
+      } else if(memLevel == ftm::Cache::AM) {
+        declareOR->setAttr(ftm::RegisterIdAttr::name, 
+          ftm::RegisterIdAttr::get(ctx, vectorOffsetRegisterIdx++));
+      }
+      builder.create<ftm::SmoviOp>(loc,
+          builder.getI64IntegerAttr(imm), declareOR);
+    } else {
+      declareOR = regInfo.declareOp;
     }
-    builder.create<ftm::SmoviOp>(loc,
-        builder.getI64IntegerAttr(imm), declareOR);
-  } else {
-    declareOR = regInfo.declareOp;
   }
 
   for(auto userOp : addiOp.getResult().getUsers()) {
@@ -149,21 +156,38 @@ bool implOffsetRegisterAllocating(arith::AddIOp addiOp, ftm::Cache memLevel,
     for(auto ptrUserOp : castOp.getResult().getUsers()) {
       if(!isa<ftm::LoadOp>(ptrUserOp) && !isa<ftm::StoreOp>(ptrUserOp))
         continue;
+      
       OpBuilder::InsertionGuard guard(builder);
       builder.setInsertionPointAfter(castOp);
       auto newCastOp = builder.create<ftm::CastOp>(loc,
           builder.getType<LLVM::LLVMPointerType>(), addiOp.getLhs());
+      
       builder.setInsertionPointAfter(ptrUserOp);
       if(auto loadOp = dyn_cast<ftm::LoadOp>(ptrUserOp)) {
-        auto newLoadOp = builder.create<ftm::LoadOp>(loc,
-            loadOp.getType(), newCastOp, declareOR.getResult());
-        newLoadOp->setAttrs(loadOp->getAttrs());
-        loadOp.getResult().replaceAllUsesWith(newLoadOp.getResult());
+        if (useImmOffset) {
+          // 使用立即数load指令
+          auto newLoadOp = builder.create<ftm::LoadImmOp>(loc,
+              loadOp.getType(), newCastOp, builder.getI64IntegerAttr(imm));
+          newLoadOp->setAttrs(loadOp->getAttrs());
+          loadOp.getResult().replaceAllUsesWith(newLoadOp.getResult());
+        } else {
+          auto newLoadOp = builder.create<ftm::LoadOp>(loc,
+              loadOp.getType(), newCastOp, declareOR.getResult());
+          newLoadOp->setAttrs(loadOp->getAttrs());
+          loadOp.getResult().replaceAllUsesWith(newLoadOp.getResult());
+        }
         loadOp.erase();
       } else if(auto storeOp = dyn_cast<ftm::StoreOp>(ptrUserOp)) {
-        auto newStoreOp = builder.create<ftm::StoreOp>(loc,
-            storeOp.getValue(), newCastOp, declareOR.getResult());
-        newStoreOp->setAttrs(storeOp->getAttrs());
+        if (useImmOffset) {
+          // 使用立即数store指令
+          auto newStoreOp = builder.create<ftm::StoreImmOp>(loc,
+              storeOp.getValue(), newCastOp, builder.getI64IntegerAttr(imm));
+          newStoreOp->setAttrs(storeOp->getAttrs());
+        } else {
+          auto newStoreOp = builder.create<ftm::StoreOp>(loc,
+              storeOp.getValue(), newCastOp, declareOR.getResult());
+          newStoreOp->setAttrs(storeOp->getAttrs());
+        }
         storeOp.erase();
       }
     }

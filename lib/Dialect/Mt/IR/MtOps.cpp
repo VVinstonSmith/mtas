@@ -510,6 +510,307 @@ void VstwOp::print(OpAsmPrinter &p) {
 }
 
 //===----------------------------------------------------------------------===//
+// Mt_SldwiOp
+//===----------------------------------------------------------------------===//
+
+llvm::SmallVector<mlir::Value, 3> SldwiOp::getReadRegisters(){
+  llvm::SmallVector<mlir::Value, 3> ReadRegs{getBase()};
+  return ReadRegs;
+}
+
+Value SldwiOp::getWrittenRegister(){
+  return getDst();
+}
+
+int SldwiOp::getLatency(){
+  return 7;  // 与非立即数版本保持相同的延迟
+}
+
+llvm::SmallVector<mlir::mt::FunctionalUnit, 2> SldwiOp::getFunctionalUnits() {
+  return {mt::FunctionalUnit::SLDST};
+}
+
+std::string SldwiOp::formatOperationOutput(StringRef functionalUnit){
+  std::ostringstream oss;
+  std::string opName = InstructionFormatter::formatInstructionName("SLDW", functionalUnit);
+  // 使用setw设置字段宽度为18，并使用left进行左对齐
+  oss << std::left << std::setw(18) << opName;
+
+  // 对于立即数版本，使用立即数属性而非偏移寄存器
+  std::string operand = InstructionFormatter::formatMemoryOperandWithImm(getBase(), getImmOffset());
+  operand.append(", ");
+  operand.append(InstructionFormatter::formatRegisterName(getDst()));
+  oss << std::left << std::setw(28) << operand;
+  
+  return oss.str();
+}
+
+ParseResult SldwiOp::parse(OpAsmParser &parser, OperationState &result) {
+  OpAsmParser::UnresolvedOperand baseInfo;
+  OpAsmParser::UnresolvedOperand dstInfo;
+  Type baseType;
+  Type resultType;
+  int64_t immOffset;
+  
+  // 解析基址操作数
+  if (parser.parseOperand(baseInfo))
+    return failure();
+
+  // 解析立即数偏移量
+  if (parser.parseOptionalLSquare() || 
+      parser.parseInteger(immOffset) ||
+      parser.parseRSquare())
+    return failure();
+  
+  // 解析逗号和目标向量操作数
+  if (parser.parseComma() || 
+      parser.parseOperand(dstInfo))
+    return failure();
+  
+  // 解析冒号和类型信息
+  if (parser.parseColon() || 
+      parser.parseType(baseType) || 
+      parser.parseComma() || 
+      parser.parseType(resultType))
+    return failure();
+  
+  // 验证目标向量类型
+  auto vectorType = resultType.dyn_cast<VectorType>();
+  if (!vectorType || vectorType.getShape().size() != 1 || 
+      vectorType.getShape()[0] != 2 || 
+      !vectorType.getElementType().isF32())
+    return parser.emitError(parser.getNameLoc(), "expected 2-element vector of f32");
+  
+  // 添加基址操作数到结果状态
+  if (parser.resolveOperand(baseInfo, baseType, result.operands))
+    return failure();
+  
+  // 添加目标向量操作数
+  if (parser.resolveOperand(dstInfo, resultType, result.operands))
+    return failure();
+  
+  // 添加立即数偏移量属性
+  result.addAttribute("immOffset", IntegerAttr::get(IntegerType::get(parser.getContext(), 64), immOffset));
+  
+  // 添加类型到结果状态
+  result.addTypes({});
+  
+  return success();
+}
+
+void SldwiOp::print(OpAsmPrinter &p) {
+  // 打印操作名和基址
+  p << ' ' << getBase();
+  
+  // 打印立即数偏移量
+  p << "[" << getImmOffset() << "]";
+  
+  // 打印逗号和目标向量以及类型信息
+  p << ", " << getDst() << " : " << getBase().getType() << ", " << getDst().getType();
+}
+
+//===----------------------------------------------------------------------===//
+// Mt_VldwiOp
+//===----------------------------------------------------------------------===//
+
+llvm::SmallVector<mlir::Value, 3> VldwiOp::getReadRegisters(){
+  llvm::SmallVector<mlir::Value, 3> ReadRegs{getBase()};
+  return ReadRegs;
+}
+
+Value VldwiOp::getWrittenRegister(){
+  return getDst();
+}
+
+int VldwiOp::getLatency(){
+  return 9; // 与非立即数版本保持相同的延迟
+}
+
+llvm::SmallVector<mlir::mt::FunctionalUnit, 2> VldwiOp::getFunctionalUnits() {
+  return {mt::FunctionalUnit::VLDST};
+}
+
+std::string VldwiOp::formatOperationOutput(StringRef functionalUnit){
+  std::ostringstream oss;
+  std::string opName = InstructionFormatter::formatInstructionName("VLDW", functionalUnit);
+  // 使用setw设置字段宽度为18，并使用left进行左对齐
+  oss << std::left << std::setw(18) << opName;
+
+  std::string operand = InstructionFormatter::formatMemoryOperandWithImm(getBase(), getImmOffset());
+  operand.append(", ");
+  operand.append(InstructionFormatter::formatRegisterName(getDst()));
+  oss << std::left << std::setw(28) << operand;
+  
+  return oss.str();
+}
+
+ParseResult VldwiOp::parse(OpAsmParser &parser, OperationState &result) {
+  OpAsmParser::UnresolvedOperand baseInfo;
+  OpAsmParser::UnresolvedOperand dstInfo;
+  Type baseType;
+  Type resultType;
+  int64_t immOffset;
+  
+  // 解析基址操作数
+  if (parser.parseOperand(baseInfo))
+    return failure();
+
+  // 解析立即数偏移量
+  if (parser.parseOptionalLSquare() || 
+      parser.parseInteger(immOffset) ||
+      parser.parseRSquare())
+    return failure();
+  
+  // 解析逗号和目标向量操作数
+  if (parser.parseComma() || 
+      parser.parseOperand(dstInfo))
+    return failure();
+  
+  // 解析冒号和类型信息
+  if (parser.parseColon() || 
+      parser.parseType(baseType) || 
+      parser.parseComma() || 
+      parser.parseType(resultType))
+    return failure();
+  
+  // 验证目标向量类型
+  auto vectorType = resultType.dyn_cast<VectorType>();
+  if (!vectorType || vectorType.getShape().size() != 1 || 
+      vectorType.getShape()[0] != 32 || 
+      !vectorType.getElementType().isF32())
+    return parser.emitError(parser.getNameLoc(), "expected 32-element vector of f32");
+  
+  // 添加基址操作数到结果状态
+  if (parser.resolveOperand(baseInfo, baseType, result.operands))
+    return failure();
+  
+  // 添加目标向量操作数
+  if (parser.resolveOperand(dstInfo, resultType, result.operands))
+    return failure();
+  
+  // 添加立即数偏移量属性
+  result.addAttribute("immOffset", IntegerAttr::get(IntegerType::get(parser.getContext(), 64), immOffset));
+  
+  // 添加类型到结果状态
+  result.addTypes({});
+  
+  return success();
+}
+
+void VldwiOp::print(OpAsmPrinter &p) {
+  // 打印操作名和基址
+  p << ' ' << getBase();
+  
+  // 打印立即数偏移量
+  p << "[" << getImmOffset() << "]";
+  
+  // 打印逗号和目标向量以及类型信息
+  p << ", " << getDst() << " : " << getBase().getType() << ", " << getDst().getType();
+}
+
+//===----------------------------------------------------------------------===//
+// Mt_VstwiOp
+//===----------------------------------------------------------------------===//
+
+llvm::SmallVector<mlir::Value, 3> VstwiOp::getReadRegisters(){
+  llvm::SmallVector<mlir::Value, 3> ReadRegs{getSrc(), getBase()};
+  return ReadRegs;
+}
+
+Value VstwiOp::getWrittenRegister(){
+  return nullptr;
+}
+
+int VstwiOp::getLatency(){
+  return 4; // 与非立即数版本保持相同的延迟
+}
+
+llvm::SmallVector<mlir::mt::FunctionalUnit, 2> VstwiOp::getFunctionalUnits() {
+  return {mt::FunctionalUnit::VLDST};
+}
+
+std::string VstwiOp::formatOperationOutput(StringRef functionalUnit){
+  std::ostringstream oss;
+  std::string opName = InstructionFormatter::formatInstructionName("VSTW", functionalUnit);
+  // 使用setw设置字段宽度为18，并使用left进行左对齐
+  oss << std::left << std::setw(18) << opName;
+
+  std::string operand = InstructionFormatter::formatRegisterName(getSrc());
+  operand.append(", ");
+  operand.append(InstructionFormatter::formatMemoryOperandWithImm(getBase(), getImmOffset()));
+  oss << std::left << std::setw(28) << operand;
+  
+  return oss.str();
+}
+
+ParseResult VstwiOp::parse(OpAsmParser &parser, OperationState &result) {
+  OpAsmParser::UnresolvedOperand srcInfo;
+  OpAsmParser::UnresolvedOperand baseInfo;
+  Type srcType;
+  Type baseType;
+  int64_t immOffset;
+  
+  // 解析源向量操作数
+  if (parser.parseOperand(srcInfo))
+    return failure();
+    
+  // 解析逗号和基址操作数
+  if (parser.parseComma() || 
+      parser.parseOperand(baseInfo))
+    return failure();
+  
+  // 解析立即数偏移量
+  if (parser.parseOptionalLSquare() || 
+      parser.parseInteger(immOffset) ||
+      parser.parseRSquare())
+    return failure();
+  
+  // 解析冒号和类型信息
+  if (parser.parseColon() || 
+      parser.parseType(srcType) || 
+      parser.parseComma() || 
+      parser.parseType(baseType))
+    return failure();
+  
+  // 验证源向量类型
+  auto vectorType = srcType.dyn_cast<VectorType>();
+  if (!vectorType || vectorType.getShape().size() != 1 || 
+      vectorType.getShape()[0] != 32 || 
+      !vectorType.getElementType().isF32())
+    return parser.emitError(parser.getNameLoc(), "expected 32-element vector of f32");
+  
+  // 添加源向量操作数到结果状态
+  if (parser.resolveOperand(srcInfo, srcType, result.operands))
+    return failure();
+  
+  // 添加基址操作数到结果状态
+  if (parser.resolveOperand(baseInfo, baseType, result.operands))
+    return failure();
+  
+  // 添加立即数偏移量属性
+  result.addAttribute("immOffset", IntegerAttr::get(IntegerType::get(parser.getContext(), 64), immOffset));
+  
+  // 添加类型到结果状态
+  result.addTypes({});
+  
+  return success();
+}
+
+void VstwiOp::print(OpAsmPrinter &p) {
+  // 打印操作名和源向量
+  p << ' ' << getSrc();
+  
+  // 打印逗号和基址
+  p << ", " << getBase();
+  
+  // 打印立即数偏移量
+  p << "[" << getImmOffset() << "]";
+  
+  // 打印类型信息
+  p << " : " << getSrc().getType() << ", " << getBase().getType();
+}
+
+//===----------------------------------------------------------------------===//
 // Mt_SvbcastOp
 //===----------------------------------------------------------------------===//
 

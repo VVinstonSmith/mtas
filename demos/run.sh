@@ -1,41 +1,50 @@
 
-../build/bin/mtas-opt matmul_micro_kernel.mlir \
-    -split-matmul \
-    -cse -canonicalize -cse \
-    -tile-linalg-dims \
-    -cse -canonicalize \
-    -loop-unrolling \
-    -cse -canonicalize -cse \
-    -lower-linalg-ops \
-    -cse -canonicalize -cse \
-    -lower-kernel-arguments \
-    -fold-memref-alias-ops \
-    -convert-memref-to-ptr \
-    -expand-strided-metadata \
-    -finalize-memref-to-llvm \
-    -lower-affine \
-    -cse -canonicalize -cse \
-    -loop-invariant-code-motion \
-    -cse -canonicalize -cse \
-    -cast-ptr-to-int64 \
-    -cse -canonicalize -cse \
-    -loop-folding \
-    -fold-register-alloca \
-    -cse -canonicalize -cse \
-    -allocate-offset-registers \
-    -cse -canonicalize -cse \
-    -loop-strength-reduce \
-    
-    # -cse -canonicalize -cse \
-
-    # -lower-load-and-store-memref-to-ptr \
-    # -lower-matmul-to-fma \
-    # -cse -canonicalize \
-    # -cse -canonicalize -cse \
-    # -fold-memref-alias-ops \
-
-    
-    # -cse -canonicalize \
-
-    
-  
+../build/bin/mtas-opt \
+    matmul_micro_kernel.mlir \
+    -split-matmul  \
+    -cse -canonicalize -cse  \
+    -tile-linalg-dims  \
+    -cse -canonicalize -cse  \
+    -loop-unrolling  \
+    -cse -canonicalize -cse  \
+    -lower-linalg-ops  \
+    -cse -canonicalize -cse  \
+    -lower-kernel-arguments  \
+    -fold-memref-alias-ops  \
+    -convert-memref-to-ptr  \
+    -expand-strided-metadata  \
+    -finalize-memref-to-llvm  \
+    -lower-affine  \
+    -cse -canonicalize -cse  \
+    -loop-invariant-code-motion  \
+    -cse -canonicalize -cse  \
+    -cast-ptr-to-int64  \
+    -cse -canonicalize -cse  \
+    -loop-folding  \
+    -cse -canonicalize -cse  \
+    -fold-register-alloca  \
+    -cse -canonicalize -cse  \
+    -allocate-offset-registers  \
+    -cse -canonicalize -cse  \
+    -fix-offset-register-assignment  \
+    -cse -canonicalize -cse  \
+    -loop-strength-reduce  \
+    -cse -canonicalize -cse  \
+    -address-base-transformation  \
+    -cse -canonicalize -cse  \
+    -eliminate-identity-casts  \
+    -cse -canonicalize -cse  \
+    -allocate-address-registers  \
+    -cse -canonicalize -cse  \
+    --convert-arith-to-llvm='index-bitwidth=64'  \
+    -convert-for-index-to-i64  \
+    -cse -canonicalize -cse  \
+    -lower-ftm-to-mt  \
+    -cse -canonicalize -cse  \
+    -reduce-80bit-instructions  \
+    -cse -canonicalize -cse  \
+    -generate-condition-and-labels-for-loops  \
+    -cse -canonicalize -cse  \
+    -instruction-scheduling-and-packing  \
+    -cse -canonicalize -cse  \
+    > ../build/debug_output.log 2>&1
