@@ -49,7 +49,8 @@ bool applyLoopFolding(scf::ForOp loopOp) {
     loopStep = cstOp.value();
   else return false;
 
-  if((upperBound - lowerBound) / loopStep > 16)
+  // 保证k不展开，ij都展开
+  if((upperBound - lowerBound) / loopStep > 18)
     return false;
 
   builder.setInsertionPoint(loopOp);
@@ -74,19 +75,20 @@ bool applyLoopFolding(scf::ForOp loopOp) {
         if (fmaOp->hasAttr("matmul.n")) {
           // 如果已有n属性，说明此循环是m循环
           fmaOp->setAttr("matmul.m", builder.getI32IntegerAttr(currentIndex));
-          // 判断当前loopOp是否有ftm.unroll_segment属性
-          if(loopOp->hasAttr("ftm.unroll_segment")){
-            // 获取属性
-            if (auto ftmAttr = dyn_cast<mlir::ftm::UnrollSegmentAttr>(
-                loopOp->getAttr("ftm.unroll_segment"))) {
-              // 获取segmentId参数值
-              auto kValue = ftmAttr.getSegmentId() ? ftmAttr.getSegmentId() : 0;
-              fmaOp->setAttr("matmul.k", builder.getI32IntegerAttr(kValue));
-            }
-          }
         } else {
           // 如果没有n属性，说明此循环是n循环
+          fmaOp->setAttr("matmul.m", builder.getI32IntegerAttr(0));
           fmaOp->setAttr("matmul.n", builder.getI32IntegerAttr(currentIndex / 32));
+        }
+        // 判断当前loopOp是否有ftm.unroll_segment属性
+        if(loopOp->hasAttr("ftm.unroll_segment")){
+          // 获取属性
+          if (auto ftmAttr = dyn_cast<mlir::ftm::UnrollSegmentAttr>(
+              loopOp->getAttr("ftm.unroll_segment"))) {
+            // 获取segmentId参数值
+            auto kValue = ftmAttr.getSegmentId() ? ftmAttr.getSegmentId() : 0;
+            fmaOp->setAttr("matmul.k", builder.getI32IntegerAttr(kValue));
+          }
         }
       }
       return WalkResult::advance();

@@ -133,21 +133,34 @@ bool implLinalgOpTiling(Operation* op) {
   SmallVector<int64_t> innerTileSizes(nLoops, 0);
 
   // classify outer loops and inner loops
-  for(auto [oprIdx, oprIdxMap] : llvm::enumerate(linalgOp.getIndexingMapsArray())) {
-    if(OperandMemLevels[oprIdx] == ftm::Cache::Unknown)
-      continue;
-    auto operand = linalgOp->getOperand(oprIdx);
-    auto memrefType = operand.getType().cast<MemRefType>();
-    for(int64_t dimIdx = 0; dimIdx < memrefType.getRank(); dimIdx++) {
-      auto linalgDimIdx = oprIdxMap.getDimPosition(dimIdx);
-      if(memrefType.getDimSize(dimIdx) / tileSizes[linalgDimIdx] < 16) {
-        innerTileSizes[linalgDimIdx] = tileSizes[linalgDimIdx];
-      } else {
-        outerTileSizes[linalgDimIdx] = tileSizes[linalgDimIdx];
+  // 对于matmul操作，假设循环顺序为：i=0, j=1, k=2
+  if(isa<linalg::MatmulOp>(op)) {
+    int64_t i_idx = 0; // 对应于矩阵乘法的i循环
+    int64_t j_idx = 1; // 对应于矩阵乘法的j循环
+    int64_t k_idx = 2; // 对应于矩阵乘法的k循环
+
+    // 设定kij顺序：k为最外层，i为中间层，j为最内层
+    outerTileSizes[k_idx] = tileSizes[k_idx]; // k为最外层循环
+    innerTileSizes[i_idx] = tileSizes[i_idx]; // i为第二层循环
+    innerTileSizes[j_idx] = tileSizes[j_idx]; // j为最内层循环（向量化）
+  } else {
+    for(auto [oprIdx, oprIdxMap] : llvm::enumerate(linalgOp.getIndexingMapsArray())) {
+      if(OperandMemLevels[oprIdx] == ftm::Cache::Unknown)
+        continue;
+      auto operand = linalgOp->getOperand(oprIdx);
+      auto memrefType = operand.getType().cast<MemRefType>();
+      for(int64_t dimIdx = 0; dimIdx < memrefType.getRank(); dimIdx++) {
+        auto linalgDimIdx = oprIdxMap.getDimPosition(dimIdx);
+        if(memrefType.getDimSize(dimIdx) / tileSizes[linalgDimIdx] < 16) {
+          innerTileSizes[linalgDimIdx] = tileSizes[linalgDimIdx];
+        } else {
+          outerTileSizes[linalgDimIdx] = tileSizes[linalgDimIdx];
+        }
       }
     }
   }
 
+  // 分别对外层和内层进行分块
   auto [outerTiledOp, outerLoops] = applyTiling(op, outerTileSizes, {});
   auto [innerTiledOp, innerLoops] = applyTiling(outerTiledOp.back(), innerTileSizes, {});
 
