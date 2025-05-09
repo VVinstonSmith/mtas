@@ -55,6 +55,15 @@ std::unique_ptr<Pass> createAssignRegisterIdsPass();
 /// Create a pass to perform instruction scheduling and packing
 std::unique_ptr<Pass> createInstructionSchedulingAndPackingPass();
 
+/// Create a pass to optimize MatMul by accumulating directly on destination registers
+std::unique_ptr<Pass> createMatMulInPlaceAccumulationPass();
+
+/// Create a pass to optimize register usage by reusing registers that are no longer needed
+std::unique_ptr<Pass> createRegisterReuseOptimizationPass();
+
+/// Create a pass to eliminate dead code in the Mt dialect
+std::unique_ptr<Pass> createMtDeadCodeEliminationPass();
+
 //===----------------------------------------------------------------------===//
 // Registration
 //===----------------------------------------------------------------------===//

@@ -42,7 +42,7 @@ class RegisterIdManager {
       availableRanges = {
           {ftm::Cache::ScalarRegister,
            {{7, 9}, {26, 31}, {42, 61}}},                 // 标量寄存器范围
-          {ftm::Cache::VectorRegister, {{0, 61}}},        // 向量寄存器范围
+          {ftm::Cache::VectorRegister, {{0, 63}}},        // 向量寄存器范围
           {ftm::Cache::VectorAddressRegister, {{0, 6}}},  // 向量基址寄存器范围
           {ftm::Cache::ScalarAddressRegister,
            {{10, 15}}},                                    // 标量基址寄存器范围

@@ -10,6 +10,9 @@ add_mlir_dialect_library(MLIRMtTransforms
     ExecutionPacketUtils.cpp
     Reduce80BitInstructions.cpp
     AssignRegisterIds.cpp
+    MatMulInPlaceAccumulation.cpp
+    RegisterReuseOptimization.cpp
+    MtDeadCodeElimination.cpp
 
     ADDITIONAL_HEADER_DIRS
     ${MTAS_SOURCE_DIR}/include/mtas/Dialect/Mt

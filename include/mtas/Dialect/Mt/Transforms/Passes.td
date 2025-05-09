@@ -79,5 +79,29 @@ def InstructionSchedulingAndPacking : Pass<"instruction-scheduling-and-packing",
   ];
 }
 
+def MatMulInPlaceAccumulation : Pass<"matmul-in-place-accumulation", "func::FuncOp"> {
+  let summary = "A pass to optimize MatMul by accumulating directly on destination registers";
+  let constructor = "mlir::mt::createMatMulInPlaceAccumulationPass()";
+  let dependentDialects = [
+    "mt::MtDialect"
+  ];
+}
+
+def RegisterReuseOptimization : Pass<"register-reuse-optimization", "func::FuncOp"> {
+  let summary = "A pass to optimize register usage by reusing registers that are no longer needed";
+  let constructor = "mlir::mt::createRegisterReuseOptimizationPass()";
+  let dependentDialects = [
+    "mt::MtDialect"
+  ];
+}
+
+def MtDeadCodeElimination : Pass<"mt-dead-code-elimination", "func::FuncOp"> {
+  let summary = "A pass to eliminate dead code in the Mt dialect";
+  let constructor = "mlir::mt::createMtDeadCodeEliminationPass()";
+  let dependentDialects = [
+    "mt::MtDialect"
+  ];
+}
+
 
 #endif // MTAS_DIALECT_MT_TRANSFORMS_PASSES

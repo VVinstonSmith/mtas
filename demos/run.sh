@@ -1,5 +1,6 @@
 
 ../build/bin/mtas-opt \
+    --mlir-print-ir-after-all \
     matmul_micro_kernel.mlir \
     -split-matmul  \
     -cse -canonicalize -cse  \
