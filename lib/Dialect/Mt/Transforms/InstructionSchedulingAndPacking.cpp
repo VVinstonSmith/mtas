@@ -106,7 +106,8 @@ private:
                             std::map<mt::InstructionSchedulingInterface, int> &scheduledOps,
                             std::vector<ExecutionPacket> &schedulingWindow,
                             int m_size, int n_size,
-                            int windowSize) {
+                            int windowSize,
+                            std::set<mt::InstructionSchedulingInterface> &interTrueDependencyOps) {
     // 要调度的操作集合
     std::set<mt::InstructionSchedulingInterface> toScheduleOps(inLoopOps);
     // 一个数组用于表示当前活跃的依赖边（其dst已经被调度，src还不能调度），形式为(src, dst, type, latency)
@@ -114,74 +115,81 @@ private:
     // 依赖已经满足的操作
     std::vector<mt::InstructionSchedulingInterface> readyOps;
 
-    int startCycle = 2 * windowSize - 1;
-    int endCycle = 0;
+    int startCycle = windowSize - 1;
+    int endCycle = -3 * windowSize;
 
+    // 确定最大的k
+    int maxK = 0;
+    for(auto op : toScheduleOps){
+      if (auto vfmulas32Op = dyn_cast<mt::Vfmulas32Op>(op.getOperation())) {
+        int k = vfmulas32Op->getAttrOfType<IntegerAttr>("matmul.k").getInt();
+        if(k > maxK)
+          maxK = k;
+      }
+    }
+
+    // 初始调度：调度SBR以及最后一次k的FMA
     for (auto it = toScheduleOps.begin(); it != toScheduleOps.end();) {
       auto op = *it;
-      // llvm::outs() << "操作 " << *op  << "\n";
       auto next_it = std::next(it); // 提前保存下一个迭代器
-      // 判断该操作的出边是否都在循环外
-      bool canSchedule = true;
-      for (auto [target, type, latency] : graph.getIntraLoopOutgoingDependencies(op)) {
-        // 如果target在循环内，不能进行调度
-        // llvm::outs() << *target.getOperation() << "\n";
-        if (inLoopOps.find(target) != inLoopOps.end()) {
-          canSchedule = false;
-          break;
+      // llvm::outs() << "操作 " << *op  << "\n";
+      bool success;
+      int cycle;
+      if (auto vfmulas32Op = dyn_cast<mt::Vfmulas32Op>(op.getOperation())) {
+        int k = vfmulas32Op->getAttrOfType<IntegerAttr>("matmul.k").getInt();
+        if(k != maxK){
+          it = next_it;
+          continue;
         }
-      }
-      if (canSchedule) {
-        bool success;
-        int cycle;
-        if (auto vfmulas32Op = dyn_cast<mt::Vfmulas32Op>(op.getOperation())) {
-          int m = vfmulas32Op->getAttrOfType<IntegerAttr>("matmul.m").getInt();
-          int n = vfmulas32Op->getAttrOfType<IntegerAttr>("matmul.n").getInt();
-          int baseCycle = startCycle - (std::max(op.getLatency(), (m_size * n_size + 2) / 3) - 1);
-          // 根据n_size的大小决定放置逻辑
-          if (n_size <= 3) {
-            // 如果n_size小于等于3，可以直接放置在baseCycle+m行
-            cycle = baseCycle + m;
-          } else {
-            // 计算(m,n)的编号并确定放置行
-            int index = m * n_size + n;
-            int offset = index / 3; // 对3取整
-            cycle = baseCycle + offset;
-          }
-          success = schedulingWindow[cycle % windowSize].addOperation(op);
+        int m = vfmulas32Op->getAttrOfType<IntegerAttr>("matmul.m").getInt();
+        int n = vfmulas32Op->getAttrOfType<IntegerAttr>("matmul.n").getInt();
+        int baseCycle = startCycle - (std::max(op.getLatency(), (m_size * n_size + 2) / 3) - 1);
+        // 根据n_size的大小决定放置逻辑
+        if (n_size <= 3) {
+          // 如果n_size小于等于3，可以直接放置在baseCycle+m行
+          cycle = baseCycle + m;
         } else {
-          cycle = startCycle - (op.getLatency() - 1);
-          while(cycle >= 0){
-            success = schedulingWindow[cycle % windowSize].addOperation(op);
-            if(success)
-              break;
-            cycle--;
-          }
+          // 计算(m,n)的编号并确定放置行
+          int index = m * n_size + n;
+          int offset = index / 3; // 对3取整
+          cycle = baseCycle + offset;
         }
-        if(!success){
-          // 报错并终止程序
-          llvm::errs() << "调度失败，操作 " << *op << " 无法被调度到任何周期\n";
-          signalPassFailure();
-          return;
+        success = schedulingWindow[(cycle % windowSize + windowSize) % windowSize].addOperation(op);
+      } else if (auto sbrOp = dyn_cast<mt::SbrLabelOp>(op.getOperation())){
+        cycle = startCycle - (op.getLatency() - 1);
+        while(cycle >= 0){
+          success = schedulingWindow[(cycle % windowSize + windowSize) % windowSize].addOperation(op);
+          if(success)
+            break;
+          cycle--;
         }
-        llvm::outs() << "操作 " << *op << " 被调度到周期 " << cycle << "\n";
-        scheduledOps[op] = cycle;
-        toScheduleOps.erase(op);
-        // 将该操作的入边添加到活跃边中
-        auto inDeps = graph.getIntraLoopIncomingDependencies(op);
-        for (auto [source, type, latency] : inDeps) {
-          if (inLoopOps.find(source) == inLoopOps.end()) {
-            continue;
-          }
-          activeEdges.push_back(std::make_tuple(source, op, type, latency));
+      } else {
+        it = next_it;
+        continue;
+      }
+      if(!success){
+        // 报错并终止程序
+        llvm::errs() << "调度失败，操作 " << *op << " 无法被调度到任何周期\n";
+        signalPassFailure();
+        return;
+      }
+      // llvm::outs() << "操作 " << *op << " 被调度到周期 " << cycle << "\n";
+      scheduledOps[op] = cycle;
+      toScheduleOps.erase(op);
+      // 将该操作的真依赖入边添加到活跃边中
+      auto inDeps = graph.getIncomingTrueDependencies(op);
+      for (auto [source, type, latency] : inDeps) {
+        if (inLoopOps.find(source) == inLoopOps.end()) {
+          continue;
         }
+        activeEdges.push_back(std::make_tuple(source, op, type, latency));
       }
       it = next_it; // 无论是否删除，都使用预先保存的下一个迭代器
     }
 
-    // // 输出当前的调度窗口
-    // llvm::outs() << "当前调度窗口:\n";
-    // printSchedulingWindowAsTable(schedulingWindow);
+    // 输出当前的调度窗口
+    llvm::outs() << "当前调度窗口:\n";
+    printSchedulingWindowAsTable(schedulingWindow);
 
     // // 输出所有活跃边
     // llvm::outs() << "当前活跃边:\n";
@@ -200,19 +208,28 @@ private:
         if(scheduledOps.find(target) != scheduledOps.end() && cycle + latency <= scheduledOps[target]){
           // 从活跃边中删除该边
           it = activeEdges.erase(it);
-          // 检查源操作的所有出边是否都满足条件
+          // 检查源操作的所有真依赖出边是否都满足条件
           bool allReady = true;
-          for(auto [target, type, latency] : graph.getIntraLoopOutgoingDependencies(source)){
+          bool interTrueDependency = true;
+          for(auto [target, type, latency] : graph.getOutgoingTrueDependencies(source)){
+            if(target == source)
+              continue;
             // 有任何一个出边不满足条件，则不能调度该操作
             if(scheduledOps.find(target) == scheduledOps.end() || cycle + latency > scheduledOps[target]){
               allReady = false;
               break;
             }
+            if(DependencyGraph::isIntraLoopDependency(type)){
+              interTrueDependency = false;
+            }
           }
           if(allReady){
             // 如果所有出边都满足条件，则将源操作添加到准备调度的操作列表中
-            llvm::outs() << "操作 " << *source.getOperation() << " 的所有出边都满足条件\n";
+            // llvm::outs() << "操作 " << *source.getOperation() << " 的所有出边都满足条件\n";
             readyOps.push_back(source);
+            if(interTrueDependency){
+              interTrueDependencyOps.insert(source);
+            }
           }
         } else {
           ++it;
@@ -224,21 +241,21 @@ private:
         auto op = *it;
         if(scheduledOps.find(op) != scheduledOps.end()){
           // 如果该操作已经被调度，则跳过
-          llvm::outs() << "操作 " << *op << " 已经被调度到周期 " << scheduledOps[op] << "\n";
+          // llvm::outs() << "操作 " << *op << " 已经被调度到周期 " << scheduledOps[op] << "\n";
           it = readyOps.erase(it);
           continue;
         }
-        bool success = schedulingWindow[cycle % windowSize].addOperation(op);
+        bool success = schedulingWindow[(cycle % windowSize + windowSize) % windowSize].addOperation(op);
         if(success){
           it = readyOps.erase(it);
-          llvm::outs() << "操作 " << *op << " 被调度到周期 " << cycle << "\n";
+          // llvm::outs() << "操作 " << *op << " 被调度到周期 " << cycle << "\n";
           // 将该操作添加到已调度操作集中
           scheduledOps[op] = cycle;
           // 从待调度操作集中删除该操作
           toScheduleOps.erase(op);
           
           // 将该操作的入边添加到活跃边中
-          for (auto [source, type, latency] : graph.getIntraLoopIncomingDependencies(op)) {
+          for (auto [source, type, latency] : graph.getIncomingTrueDependencies(op)) {
             // 如果该依赖的源操作不属于循环内的操作，则跳过
             if(inLoopOps.find(source) == inLoopOps.end()){
               continue;
@@ -246,7 +263,7 @@ private:
             // 如果边的latency是0，直接检查该边的src是否可以加入readyOps
             if(latency == 0){
               bool allReady = true;
-              for(auto [target, type, latency] : graph.getIntraLoopOutgoingDependencies(source)){
+              for(auto [target, type, latency] : graph.getOutgoingTrueDependencies(source)){
                 // 有任何一个出边不满足条件，则不能调度该操作
                 if(scheduledOps.find(target) == scheduledOps.end() || cycle + latency > scheduledOps[target]){
                   allReady = false;
@@ -254,7 +271,7 @@ private:
                 }
               }
               if(allReady){
-                llvm::outs() << "操作 " << *source.getOperation() << " 的所有出边都满足条件\n";
+                // llvm::outs() << "操作 " << *source.getOperation() << " 的所有出边都满足条件\n";
                 readyOps.push_back(source);
               }
             } else {
@@ -263,7 +280,7 @@ private:
             }
           }
         } else {
-          llvm::outs() << "操作 " << *op << " 无法被调度到周期 " << cycle << "\n";
+          // llvm::outs() << "操作 " << *op << " 无法被调度到周期 " << cycle << "\n";
           ++it;
         }
       }
@@ -286,32 +303,38 @@ private:
       const DependencyGraph &graph,
       const std::set<mt::InstructionSchedulingInterface> &inLoopOps,
       std::map<mt::InstructionSchedulingInterface, int> &scheduledOps,
-      int windowSize) {
+      int windowSize,
+      std::set<mt::InstructionSchedulingInterface> &interTrueDependencyOps) {
+
+    // 将循环间真依赖的操作减去窗口大小，因为第一次迭代不需要循环间真依赖的操作
+    for(auto op : interTrueDependencyOps){
+      scheduledOps[op] += windowSize;
+    }
       
-    // 将循环中小于迭代窗口的操作加上迭代窗口的大小，记录为第二次迭代
-    std::map<mt::InstructionSchedulingInterface, int> secondIterationScheduledOps;
-    for(auto [op, cycle] : scheduledOps) {
-      if(cycle < windowSize) {
-        secondIterationScheduledOps[op] = cycle + windowSize;
-      }
-    }
+    // // 将循环中小于迭代窗口的操作加上迭代窗口的大小，记录为第二次迭代
+    // std::map<mt::InstructionSchedulingInterface, int> secondIterationScheduledOps;
+    // for(auto [op, cycle] : scheduledOps) {
+    //   if(cycle < windowSize) {
+    //     secondIterationScheduledOps[op] = cycle + windowSize;
+    //   }
+    // }
     
-    // 遍历第二次迭代中每个操作的入边，检查是否有循环间真依赖不满足
-    for(auto [op, cycle] : secondIterationScheduledOps) {
-      for (auto [source, type, latency] : graph.getInterLoopIncomingDependencies(op)) {
-        // 如果source不属于循环内的操作，或依赖不属于循环间真依赖，则跳过
-        if(inLoopOps.find(source) == inLoopOps.end() || !DependencyGraph::isTrueDependency(type)) {
-          continue;
-        }
+    // // 遍历第二次迭代中每个操作的入边，检查是否有循环间真依赖不满足
+    // for(auto [op, cycle] : secondIterationScheduledOps) {
+    //   for (auto [source, type, latency] : graph.getInterLoopIncomingDependencies(op)) {
+    //     // 如果source不属于循环内的操作，或依赖不属于循环间真依赖，则跳过
+    //     if(inLoopOps.find(source) == inLoopOps.end() || !DependencyGraph::isTrueDependency(type)) {
+    //       continue;
+    //     }
         
-        // 如果有不满足的依赖关系，将源操作的调度周期调整
-        if(scheduledOps[source] + latency > cycle) {
-          llvm::outs() << "操作 " << source << " 的调度周期由 " << scheduledOps[source] 
-                      << " 改为 " << scheduledOps[source] - windowSize << "\n";
-          scheduledOps[source] -= windowSize;
-        }
-      }
-    }
+    //     // 如果有不满足的依赖关系，将源操作的调度周期调整
+    //     if(scheduledOps[source] + latency > cycle) {
+    //       // llvm::outs() << "操作 " << source << " 的调度周期由 " << scheduledOps[source] 
+    //       //             << " 改为 " << scheduledOps[source] - windowSize << "\n";
+    //       scheduledOps[source] -= windowSize;
+    //     }
+    //   }
+    // }
   }
 
   std::set<mt::InstructionSchedulingInterface> findPostLoopOperations(
@@ -371,7 +394,7 @@ private:
     }
 
     // 前向调度循环后的操作
-    int cycle = 2 * startCycle;
+    int cycle = startCycle;
     while(!toScheduleOps.empty()){
       // 创建新执行包
       packetsAfterLoop.push_back(ExecutionPacket());
@@ -398,7 +421,7 @@ private:
           }
           if(allReady){
             // 如果所有入边都满足条件，则将目标操作添加到准备调度的操作列表中
-            llvm::outs() << "操作 " << *target.getOperation() << " 的所有入边都满足条件\n";
+            // llvm::outs() << "操作 " << *target.getOperation() << " 的所有入边都满足条件\n";
             readyOps.push_back(target);
           }
         } else {
@@ -411,14 +434,14 @@ private:
         auto op = *it;
         if(scheduledOps.find(op) != scheduledOps.end()){
           // 如果该操作已经被调度，则跳过
-          llvm::outs() << "操作 " << *op << " 已经被调度到周期 " << scheduledOps[op] << "\n";
+          // llvm::outs() << "操作 " << *op << " 已经被调度到周期 " << scheduledOps[op] << "\n";
           it = readyOps.erase(it);
           continue;
         }
-        bool success = packetsAfterLoop[cycle - 2 * startCycle].addOperation(op);
+        bool success = packetsAfterLoop[cycle - startCycle].addOperation(op);
         if(success){
           it = readyOps.erase(it);
-          llvm::outs() << "操作 " << *op << " 被调度到周期 " << cycle << "\n";
+          // llvm::outs() << "操作 " << *op << " 被调度到周期 " << cycle << "\n";
           // 将该操作添加到已调度操作集中
           scheduledOps[op] = cycle;
           // 从待调度操作集中删除该操作
@@ -441,7 +464,7 @@ private:
                 }
               }
               if(allReady){
-                llvm::outs() << "操作 " << *target.getOperation() << " 的所有入边都满足条件\n";
+                // llvm::outs() << "操作 " << *target.getOperation() << " 的所有入边都满足条件\n";
                 readyOps.push_back(target);
               }
             } else {
@@ -450,7 +473,7 @@ private:
             }
           }
         } else {
-          llvm::outs() << "操作 " << *op << " 无法被调度到周期 " << cycle << "\n";
+          // llvm::outs() << "操作 " << *op << " 无法被调度到周期 " << cycle << "\n";
           ++it;
         }
       }
@@ -462,27 +485,67 @@ private:
     }
   }
 
+  int calculatePrologueCount(int cycle, int windowSize) {
+      if (cycle >= windowSize)
+          llvm_unreachable("周期 cycle 必须小于窗口大小 windowSize");
+      return (windowSize - 1 - cycle) / windowSize;
+  }
+
   // 实现软件流水线的prologue
   void implementPrologueForSoftwarePipelining(
       const std::vector<ExecutionPacket> &schedulingWindow,
       std::vector<ExecutionPacket> &packetsBeforeLoop,
       const std::map<mt::InstructionSchedulingInterface, int> &scheduledOps,
-      int windowSize) {
-      
-    // 预分配prologue的空间
-    packetsBeforeLoop.resize(windowSize);
-    
-    // 定义过滤条件：只保留那些调度周期在窗口大小范围内的操作
-    auto filterCondition = [&scheduledOps, windowSize](InstructionSchedulingInterface op) -> bool {
-      return op && 
-            scheduledOps.find(op) != scheduledOps.end() && 
-            scheduledOps.at(op) < windowSize;
-    };
-    
-    // 将schedulingWindow中的执行包以逆序方式复制到packetsBeforeLoop
-    for (int i = 0; i < windowSize; ++i) {
-      // 逆序复制，并应用过滤条件
-      packetsBeforeLoop[i] = schedulingWindow[windowSize - 1 - i].createFilteredCopy(filterCondition);
+      int windowSize
+      // , std::set<mt::InstructionSchedulingInterface> &interTrueDependencyOps
+      ) {
+
+    // 找到scheduledOps最小的执行周期
+    int minCycle = 0;
+    for(auto [op, cycle] : scheduledOps){
+      if(cycle < minCycle)
+        minCycle = cycle;
+    }
+
+    // 使用最小周期计算prologue的窗口数量
+    int windowCount = calculatePrologueCount(minCycle, windowSize);
+
+    int windowIndex = windowCount;
+    while(windowIndex > 0){
+      // 计算本次复制的边界
+      int intraBoundary = windowSize * (windowIndex - windowCount);
+      // int interBoundary = intraBoundary - windowSize;
+
+      // 定义过滤条件：只保留那些调度周期在窗口大小范围内的操作
+      auto filterCondition = [&scheduledOps, intraBoundary
+          // , &interTrueDependencyOps, interBoundary
+          ](InstructionSchedulingInterface op) -> bool {
+        if(!op)
+          return false;
+        if(scheduledOps.find(op) == scheduledOps.end())
+          return false;
+        int cycle = scheduledOps.at(op);
+        // if(interTrueDependencyOps.find(op) != interTrueDependencyOps.end())
+        //   return cycle < interBoundary;
+        // else
+          return cycle < intraBoundary;
+      };
+
+      for (int i = 0; i < windowSize; ++i) {
+        // 逆序复制，并应用过滤条件
+        packetsBeforeLoop.push_back(schedulingWindow[windowSize - 1 - i].createFilteredCopy(filterCondition));
+      }
+
+      windowIndex--;
+    }
+
+    // 清除空的执行包
+    for(int i = packetsBeforeLoop.size() - 1; i >= 0; i--){
+      auto &packet = packetsBeforeLoop[i];
+      if(!packet.isFree())
+        break;
+      // 删除开头的空执行包
+      packetsBeforeLoop.pop_back();
     }
   }
 
@@ -536,11 +599,11 @@ private:
     // }
 
     // 开始周期为windowSize - 1，不断递减
-    int cycle = startCycle - 1;
+    int cycle = startCycle;
     // 结束条件为toScheduleOps中的所有操作都被调度
     while(!toScheduleOps.empty()){
       // 调度包索引和cycle的关系为 调度索引等于windowSize - 1 - cycle
-      int packetIndex = startCycle - 1 - cycle;
+      int packetIndex = startCycle - cycle;
       // 如果索引超出范围，创建新的执行包
       if(packetIndex >= packetsBeforeLoop.size()){
         packetsBeforeLoop.push_back(ExecutionPacket());
@@ -564,11 +627,13 @@ private:
             // 有任何一个出边不满足条件，则不能调度该操作
             if(scheduledOps.find(target) == scheduledOps.end() || cycle + latency > scheduledOps[target]){
               allReady = false;
+              // llvm::outs() << "操作 " << *source.getOperation() << " 的出边未满足条件\n";
+              break;
             }
           }
           if(allReady){
             // 如果所有出边都满足条件，则将源操作添加到准备调度的操作列表中
-            llvm::outs() << "操作 " << *source.getOperation() << " 的所有出边都满足条件\n";
+            // llvm::outs() << "操作 " << *source.getOperation() << " 的所有出边都满足条件\n";
             readyOps.push_back(source);
             // 从活跃边中删除该边
             it = activeEdges.erase(it);
@@ -585,14 +650,14 @@ private:
         auto op = *it;
         if(scheduledOps.find(op) != scheduledOps.end()){
           // 如果该操作已经被调度，则跳过
-          llvm::outs() << "操作 " << *op << " 已经被调度到周期 " << scheduledOps[op] << "\n";
+          // llvm::outs() << "操作 " << *op << " 已经被调度到周期 " << scheduledOps[op] << "\n";
           it = readyOps.erase(it);
           continue;
         }
         bool success = currentPacket.addOperation(op);
         if(success){
           it = readyOps.erase(it);
-          llvm::outs() << "操作 " << *op << " 被调度到周期 " << cycle << "\n";
+          // llvm::outs() << "操作 " << *op << " 被调度到周期 " << cycle << "\n";
           // 将该操作添加到已调度操作集中
           scheduledOps[op] = cycle;
           // 从待调度操作集中删除该操作
@@ -615,7 +680,7 @@ private:
                 }
               }
               if(allReady){
-                llvm::outs() << "操作 " << *source.getOperation() << " 的所有出边都满足条件\n";
+                // llvm::outs() << "操作 " << *source.getOperation() << " 的所有出边都满足条件\n";
                 readyOps.push_back(source);
               }
             } else {
@@ -624,7 +689,7 @@ private:
             }
           }
         } else {
-          llvm::outs() << "操作 " << *op << " 无法被调度到周期 " << cycle << "\n";
+          // llvm::outs() << "操作 " << *op << " 无法被调度到周期 " << cycle << "\n";
           ++it;
         }
       }
@@ -648,14 +713,14 @@ private:
     // 分析函数内可调度操作的依赖关系
     DependencyAnalyzer analyzer = DependencyAnalyzer::forFunction(funcOp);
     analyzer.analyze();
-    analyzer.printDependenciesInOrder();
+    // analyzer.printDependenciesInOrder();
     DependencyGraph graph = analyzer.getDependencyGraph();
 
     // 获取矩阵维度
     auto [k_size, m_size, n_size] = getMatrixDimensions(forOp);
-    llvm::outs() << "k_size: " << k_size << "\n";
-    llvm::outs() << "m_size: " << m_size << "\n";
-    llvm::outs() << "n_size: " << n_size << "\n";
+    // llvm::outs() << "k_size: " << k_size << "\n";
+    // llvm::outs() << "m_size: " << m_size << "\n";
+    // llvm::outs() << "n_size: " << n_size << "\n";
 
     // 计算调度窗口大小
     int windowSize = calculateWindowSize(k_size, m_size, n_size);
@@ -675,16 +740,17 @@ private:
     // }
 
     // 反向调度循环中的操作
-    backwardScheduleLoopOps(graph, inLoopOps, scheduledOps, schedulingWindow, m_size, n_size, windowSize);
-    // llvm::outs() << "最终调度窗口:\n";
-    // printSchedulingWindowAsTable(schedulingWindow);
+    std::set<mt::InstructionSchedulingInterface> interTrueDependencyOps;
+    backwardScheduleLoopOps(graph, inLoopOps, scheduledOps, schedulingWindow, m_size, n_size, windowSize, interTrueDependencyOps);
+    llvm::outs() << "最终调度窗口:\n";
+    printSchedulingWindowAsTable(schedulingWindow);
 
     // 对调度结果进行微调，解决循环间真依赖问题
-    adjustLoopScheduling(graph, inLoopOps, scheduledOps, windowSize);
-    // llvm::outs() << "最终调度结果:\n";
-    // for(auto [op, cycle] : scheduledOps){
-    //   llvm::outs() << "  " << op << " 被调度到周期 " << cycle << "\n";
-    // }
+    adjustLoopScheduling(graph, inLoopOps, scheduledOps, windowSize, interTrueDependencyOps);
+    // // llvm::outs() << "最终调度结果:\n";
+    // // for(auto [op, cycle] : scheduledOps){
+    // //   llvm::outs() << "  " << op << " 被调度到周期 " << cycle << "\n";
+    // // }
 
     // 找到循环后的操作
     std::set<mt::InstructionSchedulingInterface> postLoopOps = 
@@ -697,14 +763,14 @@ private:
     // 前向调度循环后的操作
     std::vector<ExecutionPacket> packetsAfterLoop;
     forwardSchedulePostLoopOps(graph, postLoopOps, scheduledOps, packetsAfterLoop, windowSize);
-    // llvm::outs() << "循环后操作的调度结果:\n";
-    // printSchedulingWindowAsTable(packetsAfterLoop);
+    llvm::outs() << "循环后操作的调度结果:\n";
+    printSchedulingWindowAsTable(packetsAfterLoop);
 
     // 实现软件流水线的prologue
     std::vector<ExecutionPacket> packetsBeforeLoop;
     implementPrologueForSoftwarePipelining(schedulingWindow, packetsBeforeLoop, scheduledOps, windowSize);
-    // llvm::outs() << "软件流水线的prologue部分调度结果:\n";
-    // printSchedulingWindowAsTable(packetsBeforeLoop, true);
+    llvm::outs() << "软件流水线的prologue部分调度结果:\n";
+    printSchedulingWindowAsTable(packetsBeforeLoop, true);
 
     // 找到循环前的操作
     std::set<mt::InstructionSchedulingInterface> preLoopOps = 
@@ -725,26 +791,26 @@ private:
     // }
 
     // 反向调度循环前的操作
-    backwardSchedulePreLoopOps(graph, preLoopOps, scheduledOps, packetsBeforeLoop, windowSize);
+    backwardSchedulePreLoopOps(graph, preLoopOps, scheduledOps, packetsBeforeLoop, -1);
     
     // 输出完整的调度结果
     llvm::outs() << "调度结果:\n";
     printSchedulingWindowAsTable(packetsBeforeLoop, true, windowSize - packetsBeforeLoop.size());
-    printSchedulingWindowAsTable(schedulingWindow, false, windowSize);
-    printSchedulingWindowAsTable(packetsAfterLoop, false, 2*windowSize);
+    printSchedulingWindowAsTable(schedulingWindow, false);
+    printSchedulingWindowAsTable(packetsAfterLoop, false);
 
-    // std::vector<std::pair<mt::InstructionSchedulingInterface, int>> sortedScheduledOps(scheduledOps.begin(), scheduledOps.end());
-    // // 输出scheduledOps，按照cycle的顺序输出
-    // llvm::outs() << "调度结果:\n";
-    // // sortedScheduledOps赋值为scheduledOps
-    // sortedScheduledOps.clear();
-    // sortedScheduledOps.insert(sortedScheduledOps.end(), scheduledOps.begin(), scheduledOps.end());
-    // std::sort(sortedScheduledOps.begin(), sortedScheduledOps.end(), [](const auto &a, const auto &b) {
-    //   return a.second < b.second;
-    // });
-    // for(auto [op, cycle] : sortedScheduledOps){
-    //   llvm::outs() << "  " << *op.getOperation() << " 被调度到周期 " << cycle << "\n";
-    // }
+    // // std::vector<std::pair<mt::InstructionSchedulingInterface, int>> sortedScheduledOps(scheduledOps.begin(), scheduledOps.end());
+    // // // 输出scheduledOps，按照cycle的顺序输出
+    // // llvm::outs() << "调度结果:\n";
+    // // // sortedScheduledOps赋值为scheduledOps
+    // // sortedScheduledOps.clear();
+    // // sortedScheduledOps.insert(sortedScheduledOps.end(), scheduledOps.begin(), scheduledOps.end());
+    // // std::sort(sortedScheduledOps.begin(), sortedScheduledOps.end(), [](const auto &a, const auto &b) {
+    // //   return a.second < b.second;
+    // // });
+    // // for(auto [op, cycle] : sortedScheduledOps){
+    // //   llvm::outs() << "  " << *op.getOperation() << " 被调度到周期 " << cycle << "\n";
+    // // }
 
     // 反转packetsBeforeLoop
     std::reverse(packetsBeforeLoop.begin(), packetsBeforeLoop.end());

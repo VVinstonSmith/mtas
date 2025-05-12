@@ -136,6 +136,18 @@ DependencyGraph::getInterLoopIncomingDependencies(
   return getIncomingDependenciesByType(op, InterLoop);
 }
 
+SmallVector<DependencyGraph::DependencyInfo, 4> 
+DependencyGraph::getOutgoingTrueDependencies(
+    mt::InstructionSchedulingInterface op) const {
+  return getOutgoingDependenciesByType(op, TrueDependency);
+}
+
+SmallVector<DependencyGraph::DependencyInfo, 4> 
+DependencyGraph::getIncomingTrueDependencies(
+    mt::InstructionSchedulingInterface op) const {
+  return getIncomingDependenciesByType(op, TrueDependency);
+}
+
 bool DependencyGraph::isTrueDependency(DependencyType type) {
   return (type & DEPENDENCY_NATURE_MASK) == TrueDependency;
 }

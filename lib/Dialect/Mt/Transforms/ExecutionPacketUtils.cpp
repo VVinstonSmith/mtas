@@ -17,11 +17,11 @@ using namespace mlir;
 using namespace mt;
 
 bool ExecutionPacket::isFree() {
-  return SMAC[0] == nullptr || SMAC[1] == nullptr || 
-         SIEU == nullptr || SLDST == nullptr || SBR == nullptr || 
-         VMAC[0] == nullptr || VMAC[1] == nullptr || VMAC[2] == nullptr ||
-         VIEU == nullptr ||
-         VLDST[0] == nullptr || VLDST[1] == nullptr;
+  return SMAC[0] == nullptr && SMAC[1] == nullptr && 
+         SIEU == nullptr && SLDST == nullptr && SBR == nullptr && 
+         VMAC[0] == nullptr && VMAC[1] == nullptr && VMAC[2] == nullptr &&
+         VIEU == nullptr &&
+         VLDST[0] == nullptr && VLDST[1] == nullptr;
 }
 
 bool ExecutionPacket::addOperation(mt::FunctionalUnit unit, InstructionSchedulingInterface op) {

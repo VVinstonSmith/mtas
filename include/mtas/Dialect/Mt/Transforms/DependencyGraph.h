@@ -100,6 +100,14 @@ public:
   SmallVector<DependencyInfo, 4> getInterLoopIncomingDependencies(
       mt::InstructionSchedulingInterface op) const;
 
+  // 获取一个操作的真依赖出边及其目标操作
+  SmallVector<DependencyInfo, 4> getOutgoingTrueDependencies(
+      mt::InstructionSchedulingInterface op) const;
+
+  // 获取一个操作的真依赖入边及其目标操作
+  SmallVector<DependencyInfo, 4> getIncomingTrueDependencies(
+      mt::InstructionSchedulingInterface op) const;
+
   static const uint32_t DEPENDENCY_NATURE_MASK = 0x07;  // 0000 0111 (低3位)
   static const uint32_t LOOP_RELATION_MASK = 0x30;      // 0011 0000 (第5-6位)
 
