@@ -96,6 +96,7 @@ private:
     SmallVector<int, 3> windowSizeCandidates;
     windowSizeCandidates.push_back(7); // 跳转指令的延迟
     windowSizeCandidates.push_back(6 * k_size); // 基于 k 维度的大小
+    windowSizeCandidates.push_back(k_size * m_size); // 基于VBALE的数量
     windowSizeCandidates.push_back((k_size * m_size * n_size + 2) / 3); // 基于整体计算量的大小
     return *std::max_element(windowSizeCandidates.begin(), windowSizeCandidates.end());
   }
@@ -128,7 +129,7 @@ private:
       }
     }
 
-    // 初始调度：调度SBR以及最后一次k的FMA
+    // 初始调度：调度SBR及FMA
     for (auto it = toScheduleOps.begin(); it != toScheduleOps.end();) {
       auto op = *it;
       auto next_it = std::next(it); // 提前保存下一个迭代器
@@ -137,22 +138,15 @@ private:
       int cycle;
       if (auto vfmulas32Op = dyn_cast<mt::Vfmulas32Op>(op.getOperation())) {
         int k = vfmulas32Op->getAttrOfType<IntegerAttr>("matmul.k").getInt();
-        if(k != maxK){
-          it = next_it;
-          continue;
-        }
         int m = vfmulas32Op->getAttrOfType<IntegerAttr>("matmul.m").getInt();
         int n = vfmulas32Op->getAttrOfType<IntegerAttr>("matmul.n").getInt();
-        int baseCycle = startCycle - (std::max(op.getLatency(), (m_size * n_size + 2) / 3) - 1);
         // 根据n_size的大小决定放置逻辑
         if (n_size <= 3) {
-          // 如果n_size小于等于3，可以直接放置在baseCycle+m行
-          cycle = baseCycle + m;
+          // 如果n_size小于等于3
+          cycle = k * std::max(op.getLatency(), m_size) + m;
         } else {
           // 计算(m,n)的编号并确定放置行
-          int index = m * n_size + n;
-          int offset = index / 3; // 对3取整
-          cycle = baseCycle + offset;
+          cycle = k * std::max(op.getLatency(), (m_size * n_size + 2) / 3) + (m * n_size + n) / 3;
         }
         success = schedulingWindow[(cycle % windowSize + windowSize) % windowSize].addOperation(op);
       } else if (auto sbrOp = dyn_cast<mt::SbrLabelOp>(op.getOperation())){
@@ -169,7 +163,7 @@ private:
       }
       if(!success){
         // 报错并终止程序
-        llvm::errs() << "调度失败，操作 " << *op << " 无法被调度到任何周期\n";
+        llvm::errs() << "初始调度失败，操作 " << *op << " 无法被调度到任何周期\n";
         signalPassFailure();
         return;
       }
@@ -206,8 +200,6 @@ private:
         auto [source, target, type, latency] = *it;
         // 检查源操作是否可以被调度
         if(scheduledOps.find(target) != scheduledOps.end() && cycle + latency <= scheduledOps[target]){
-          // 从活跃边中删除该边
-          it = activeEdges.erase(it);
           // 检查源操作的所有真依赖出边是否都满足条件
           bool allReady = true;
           bool interTrueDependency = true;
@@ -230,6 +222,10 @@ private:
             if(interTrueDependency){
               interTrueDependencyOps.insert(source);
             }
+            // 从活跃边中删除该边
+            it = activeEdges.erase(it);
+          } else {
+            ++it;
           }
         } else {
           ++it;
@@ -404,8 +400,6 @@ private:
         auto [source, target, type, latency] = *it;
         // 检查目标操作是否可以被调度
         if(scheduledOps.find(source) != scheduledOps.end() && scheduledOps[source] + latency <= cycle){
-          // 从活跃边中删除该边
-          it = activeEdges.erase(it);
           // 检查目标操作的所有入边是否都满足条件
           bool allReady = true;
           for(auto [source, type, latency] : graph.getIntraLoopIncomingDependencies(target)){
@@ -423,6 +417,10 @@ private:
             // 如果所有入边都满足条件，则将目标操作添加到准备调度的操作列表中
             // llvm::outs() << "操作 " << *target.getOperation() << " 的所有入边都满足条件\n";
             readyOps.push_back(target);
+            // 从活跃边中删除该边
+            it = activeEdges.erase(it);
+          } else {
+            ++it;
           }
         } else {
           ++it;
@@ -698,6 +696,57 @@ private:
     }
   }
 
+  void insertReturnOp(std::vector<ExecutionPacket> &packetsAfterLoop, func::FuncOp funcOp) {
+    // 获取MLIR上下文和位置信息
+    MLIRContext *context = funcOp.getContext();
+    Location loc = funcOp.getLoc();
+    
+    // 创建构建器
+    OpBuilder builder(context);
+    
+    // 在函数开头插入DeclareRegisterOp
+    builder.setInsertionPointToStart(&funcOp.getBody().front());
+    
+    // 创建DeclareRegisterOp，设置类型为I64，编号为63
+    auto regR63 = builder.create<mt::DeclareRegisterOp>(loc, builder.getI64Type());
+    regR63->setAttr(ftm::MemLevelAttr::name, 
+                        ftm::MemLevelAttr::get(context, ftm::Cache::ScalarRegister));
+    regR63->setAttr(ftm::RegisterIdAttr::name,
+                        ftm::RegisterIdAttr::get(context, 63));
+    
+    // 查找函数中的ReturnOp
+    func::ReturnOp returnOp;
+    funcOp.walk([&](func::ReturnOp op) {
+      returnOp = op;
+    });
+    
+    if (!returnOp) {
+      funcOp.emitError("没有找到函数的ReturnOp");
+      return;
+    }
+    
+    // 在ReturnOp之前插入SBR_reg操作，目标是R63
+    builder.setInsertionPoint(returnOp);
+    auto sbrOp = builder.create<mt::SbrRegOp>(loc, regR63, /*cond=*/nullptr);
+
+    // 向packetsAfterLoop的插入SbrRegOp的起始索引为
+    // max(0, packetsAfterLoop的长度-(SbrRegOp的延迟))，以利用SbrRegOp的延迟槽
+    int sbrDelay = sbrOp.getLatency();
+    int startIndex = std::max(0, static_cast<int>(packetsAfterLoop.size()) - sbrDelay);
+    // 从起始索引开始直至最后一个packet，如果插入成功则返回
+    for (int i = startIndex; i < static_cast<int>(packetsAfterLoop.size()); ++i) {
+      // 尝试将SbrRegOp添加到当前执行包
+      if (packetsAfterLoop[i].addOperation(sbrOp)) {
+        // llvm::outs() << "SbrRegOp 成功插入到执行包 " << i << "\n";
+        // 保证SbrRegOp后面有足够的SNOP（sbrDelay-1个）
+        for(int j = 0; j < i + sbrDelay - packetsAfterLoop.size(); j++){
+          packetsAfterLoop.push_back(ExecutionPacket());
+        }
+        return;
+      }
+    }
+  }
+
   void implInstructionSchedulingAndPacking(func::FuncOp funcOp){
     std::map<mt::InstructionSchedulingInterface, int> scheduledOps;
 
@@ -792,6 +841,9 @@ private:
 
     // 反向调度循环前的操作
     backwardSchedulePreLoopOps(graph, preLoopOps, scheduledOps, packetsBeforeLoop, -1);
+
+    // 插入SBR R63
+    insertReturnOp(packetsAfterLoop, funcOp);
     
     // 输出完整的调度结果
     llvm::outs() << "调度结果:\n";
