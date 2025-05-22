@@ -44,17 +44,30 @@ class RegisterReuseOptimizationPass
  private:
   void implRegisterReuseOptimization(func::FuncOp funcOp) {
     // 遍历所有的Vbale2h操作
-    funcOp.walk([&](Vbale2hOp vbale2hOp) {
-      auto src1 = vbale2hOp.getSrc1();
-      auto src2 = vbale2hOp.getSrc2();
-      auto dst = vbale2hOp.getDst();
-      // 将其第三个操作数替换为第一个操作数
-      OpBuilder builder(vbale2hOp);
-      builder.setInsertionPoint(vbale2hOp);
-      builder.create<Vbale2hOp>(vbale2hOp.getLoc(), src1, src2, src1);
-      vbale2hOp.erase();
-      // 将第三个操作数的所有使用替换为第一个操作数
-      dst.replaceAllUsesWith(src1);
+    // funcOp.walk([&](Vbale2hOp vbale2hOp) {
+    //   auto src1 = vbale2hOp.getSrc1();
+    //   auto dst = vbale2hOp.getDst();
+    //   dst.replaceAllUsesWith(src1);
+    // });
+    funcOp.walk([&](SvbcastOp svbcastOp) {
+      auto svbcastOpDst = svbcastOp.getDst();
+      auto delRegOp = svbcastOpDst.getDefiningOp();
+      Vbale2Op vbale2Op = nullptr;
+      Vbale2hOp vbale2hOp = nullptr;
+      for (auto user : delRegOp->getUsers()) {
+        if (auto op = dyn_cast<Vbale2Op>(user)) {
+          vbale2Op = op;
+        } else if (auto op = dyn_cast<Vbale2hOp>(user)) {
+          vbale2hOp = op;
+        } else if (!isa<SvbcastOp>(user)){
+          llvm_unreachable("SvbcastOp的结果存在其他使用");
+        }
+      }
+      if (vbale2Op && vbale2hOp) {
+        auto vbale2OpDst = vbale2Op.getDst();
+        auto vbale2hOpDst = vbale2hOp.getDst();
+        vbale2hOpDst.replaceAllUsesWith(vbale2OpDst);
+      }
     });
   }
 };
