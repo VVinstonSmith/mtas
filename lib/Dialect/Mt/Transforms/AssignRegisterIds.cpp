@@ -140,6 +140,40 @@ class RegisterIdManager {
     return -1;
   }
 
+  // 分配两个连续的寄存器ID，且小的ID必须能够被2整除
+  std::pair<int64_t, int64_t> allocatePairedIds(ftm::Cache regType) {
+    // 获取对应类型的可用范围
+    const auto &ranges = availableRanges.at(regType);
+
+    // 遍历所有可用范围，寻找合适的连续ID对
+    for (const auto &range : ranges) {
+      int64_t start = range.first;
+      int64_t end = range.second;
+
+      // 如果起始ID不是偶数，调整为下一个偶数
+      if (start % 2 != 0) {
+        start++;
+      }
+
+      // 在当前范围内查找第一个可用的偶数ID，且其下一个ID也必须可用
+      for (int64_t id = start; id < end; id += 2) {  // 每次增加2以保持偶数
+        if (usedIds[regType].find(id) == usedIds[regType].end() && 
+            usedIds[regType].find(id + 1) == usedIds[regType].end()) {
+          // 将两个ID都标记为已使用
+          usedIds[regType].insert(id);
+          usedIds[regType].insert(id + 1);
+          return {id, id + 1};
+        }
+      }
+    }
+
+    // 如果所有范围都无法找到合适的连续ID对，抛出错误
+    llvm::report_fatal_error(
+        llvm::Twine("No available paired register IDs left for type ") +
+        llvm::Twine(static_cast<uint64_t>(regType)));
+    return {-1, -1};
+  }
+
   // 释放寄存器ID，将其标记为未使用
   void releaseId(ftm::Cache regType, int64_t id) { usedIds[regType].erase(id); }
 };
@@ -168,6 +202,32 @@ class AssignRegisterIdsPass
       auto regType = declareOp->getAttr(ftm::MemLevelAttr::name)
                          .cast<ftm::MemLevelAttr>()
                          .getLevel();
+
+      // 如果是向量寄存器，且被VLDDW或VSTDW使用，需要为两个寄存器一起分配寄存器编号，
+      // 也就是一次分配两个连续的编号，且小的编号必须能够被2整除
+      if(regType == ftm::Cache::VectorRegister || regType == ftm::Cache::ScalarRegister){
+        auto reg = declareOp.getResult();
+        for(auto user : reg.getUsers()){
+          if(auto dwOp = dyn_cast<mt::DoubleWordMemoryAccessInterface>(user)){
+            auto pairedIds = manager.allocatePairedIds(regType);
+            if(reg == dwOp.getHighRegister()){
+              auto otherDelOp = dwOp.getLowRegister().getDefiningOp();
+              declareOp->setAttr(ftm::RegisterIdAttr::name,
+                                ftm::RegisterIdAttr::get(declareOp.getContext(), pairedIds.second));
+              otherDelOp->setAttr(ftm::RegisterIdAttr::name,
+                                ftm::RegisterIdAttr::get(declareOp.getContext(), pairedIds.first));
+            } else if(reg == dwOp.getLowRegister()){
+              auto otherDelOp = dwOp.getHighRegister().getDefiningOp();
+              declareOp->setAttr(ftm::RegisterIdAttr::name,
+                                ftm::RegisterIdAttr::get(declareOp.getContext(), pairedIds.first));
+              otherDelOp->setAttr(ftm::RegisterIdAttr::name,
+                                ftm::RegisterIdAttr::get(declareOp.getContext(), pairedIds.second));
+            }
+            return;
+          }
+        }
+      }
+
       int64_t id = manager.allocateId(regType);
       declareOp->setAttr(ftm::RegisterIdAttr::name,
                          ftm::RegisterIdAttr::get(declareOp.getContext(), id));

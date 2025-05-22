@@ -103,5 +103,12 @@ def MtDeadCodeElimination : Pass<"mt-dead-code-elimination", "func::FuncOp"> {
   ];
 }
 
+def MergeMemoryAccess : Pass<"merge-memory-access", "func::FuncOp"> {
+  let summary = "A pass to merge adjacent memory access operations";
+  let constructor = "mlir::mt::createMergeMemoryAccessPass()";
+  let dependentDialects = [
+    "mt::MtDialect"
+  ];
+}
 
 #endif // MTAS_DIALECT_MT_TRANSFORMS_PASSES

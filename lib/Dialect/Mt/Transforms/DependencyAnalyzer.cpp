@@ -14,6 +14,8 @@
 #include "mtas/Dialect/Mt/Transforms/DependencyAnalyzer.h"
 #include "mtas/Dialect/Mt/IR/InstructionSchedulingInterface.h"
 
+#include "mtas/Dialect/Mt/IR/Mt.h"
+
 using namespace mlir;
 using namespace mt;
 
@@ -111,8 +113,8 @@ void DependencyAnalyzer::analyzeOperation(Operation *op,
   }
   
   // 写寄存器
-  auto writeReg = interface.getWrittenRegister();
-  if (writeReg) {
+  auto writeRegs = interface.getWrittenRegisters();
+  for (auto writeReg : writeRegs) {
     // 使用writeReg的所有操作到op存在反依赖
     for (auto readOp : useMap[writeReg]) {
       if (readOp.getOperation() != op) {

@@ -69,9 +69,11 @@ private:
                     vectorRegMap[reg] = imm;
                 }
             } else {
-                auto writtenReg = op.getWrittenRegister();
-                if(vectorRegMap.find(writtenReg) != vectorRegMap.end()){
-                    vectorRegMap.erase(writtenReg);
+                auto writeRegs = op.getWrittenRegisters();
+                for (auto writeReg : writeRegs) {
+                    if(vectorRegMap.find(writeReg) != vectorRegMap.end()){
+                        vectorRegMap.erase(writeReg);
+                    }
                 }
             }
         });

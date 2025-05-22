@@ -24,7 +24,7 @@ def InstructionSchedulingInterface : OpInterface<"InstructionSchedulingInterface
     InterfaceMethod<"Get all source registers read by this operation",
                     "llvm::SmallVector<mlir::Value, 3>", "getReadRegisters">,
     InterfaceMethod<"Get target register written by this operation",
-                    "mlir::Value", "getWrittenRegister">,
+                    "llvm::SmallVector<mlir::Value, 2>", "getWrittenRegisters">,
 
     // New method for formatted output of an operation
     InterfaceMethod<"Format and output this operation with scheduling information based on format options",

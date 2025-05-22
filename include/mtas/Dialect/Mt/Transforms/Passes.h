@@ -64,6 +64,9 @@ std::unique_ptr<Pass> createRegisterReuseOptimizationPass();
 /// Create a pass to eliminate dead code in the Mt dialect
 std::unique_ptr<Pass> createMtDeadCodeEliminationPass();
 
+/// Create a pass to merge memory access operations
+std::unique_ptr<Pass> createMergeMemoryAccessPass();
+
 //===----------------------------------------------------------------------===//
 // Registration
 //===----------------------------------------------------------------------===//

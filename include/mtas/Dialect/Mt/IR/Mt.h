@@ -45,6 +45,7 @@ class MtOp;
 //===----------------------------------------------------------------------===//
 
 #include "mtas/Dialect/Mt/IR/InstructionSchedulingInterface.h"
+#include "mtas/Dialect/Mt/IR/DoubleWordMemoryAccessInterface.h"
 
 //===----------------------------------------------------------------------===//
 // Mt Enums

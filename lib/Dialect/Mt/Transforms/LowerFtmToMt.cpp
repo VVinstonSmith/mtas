@@ -303,7 +303,11 @@ public:
     auto accOp = acc.getDefiningOp();
     rewriter.replaceOp(op, accOp);
 
-    rewriter.create<mt::Vfmulas32Op>(op.getLoc(), lhs, rhs, acc, acc);
+    auto vfmulas32Op = rewriter.create<mt::Vfmulas32Op>(op.getLoc(), lhs, rhs, acc, acc);
+
+    for (auto namedAttr : op->getAttrs()) {
+      vfmulas32Op->setAttr(namedAttr.getName(), namedAttr.getValue());
+    }
 
     return success();
   }

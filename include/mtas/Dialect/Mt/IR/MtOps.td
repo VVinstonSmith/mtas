@@ -19,6 +19,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ShapedOpInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mtas/Dialect/Mt/IR/InstructionSchedulingInterface.td"
+include "mtas/Dialect/Mt/IR/DoubleWordMemoryAccessInterface.td"
 
 
 class Mt_Op<string mnemonic, list<Trait> traits = []> :
@@ -128,6 +129,54 @@ def Mt_VstwiOp :
                  LLVM_AnyPointer:$base,
                  I64Attr:$immOffset)> {
   let summary = "vector store word with immediate offset operation";
+  let hasCustomAssemblyFormat = 1;
+}
+
+def Mt_VlddwOp :
+  Mt_Op<"VLDDW", [
+    DeclareOpInterfaceMethods<DoubleWordMemoryAccessInterface>, 
+  ]>,
+  Arguments<(ins LLVM_AnyPointer:$base,
+                 VectorOfLengthAndType<[32], [F32]>:$dst1,
+                 VectorOfLengthAndType<[32], [F32]>:$dst2,
+                 Optional<I64>:$offset)> {
+  let summary = "vector load double word operation";
+  let hasCustomAssemblyFormat = 1;
+}
+
+def Mt_VstdwOp :
+  Mt_Op<"VSTDW", [
+    DeclareOpInterfaceMethods<DoubleWordMemoryAccessInterface>, 
+  ]>,
+  Arguments<(ins VectorOfLengthAndType<[32], [F32]>:$src1,
+                 VectorOfLengthAndType<[32], [F32]>:$src2,
+                 LLVM_AnyPointer:$base,
+                 Optional<I64>:$offset)> {
+  let summary = "vector store double word operation";
+  let hasCustomAssemblyFormat = 1;
+}
+
+def Mt_VlddwiOp :
+  Mt_Op<"VLDDWI", [
+    DeclareOpInterfaceMethods<DoubleWordMemoryAccessInterface>, 
+  ]>,
+  Arguments<(ins LLVM_AnyPointer:$base,
+                 VectorOfLengthAndType<[32], [F32]>:$dst1,
+                 VectorOfLengthAndType<[32], [F32]>:$dst2,
+                 I64Attr:$immOffset)> {
+  let summary = "vector load double word with immediate offset operation";
+  let hasCustomAssemblyFormat = 1;
+}
+
+def Mt_VstdwiOp :
+  Mt_Op<"VSTDWI", [
+    DeclareOpInterfaceMethods<DoubleWordMemoryAccessInterface>, 
+  ]>,
+  Arguments<(ins VectorOfLengthAndType<[32], [F32]>:$src1,
+                 VectorOfLengthAndType<[32], [F32]>:$src2,
+                 LLVM_AnyPointer:$base,
+                 I64Attr:$immOffset)> {
+  let summary = "vector store double word with immediate offset operation";
   let hasCustomAssemblyFormat = 1;
 }
 

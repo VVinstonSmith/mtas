@@ -2,6 +2,7 @@ add_mlir_dialect_library(MLIRMtDialect
     MtOps.cpp
     MtDialect.cpp
     InstructionSchedulingInterface.cpp
+    DoubleWordMemoryAccessInterface.cpp
     InstructionFormatter.cpp
 
     ADDITIONAL_HEADER_DIRS
@@ -10,6 +11,7 @@ add_mlir_dialect_library(MLIRMtDialect
     DEPENDS
     MLIRMtOpsIncGen
     MLIRMtInstructionSchedulingInterfaceIncGen
+    MLIRMtDoubleWordMemoryAccessInterfaceIncGen
     MLIRMtEnumsIncGen
     # MLIRMtAttrsIncGen
 

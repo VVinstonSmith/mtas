@@ -13,6 +13,7 @@ add_mlir_dialect_library(MLIRMtTransforms
     MatMulInPlaceAccumulation.cpp
     RegisterReuseOptimization.cpp
     MtDeadCodeElimination.cpp
+    MergeMemoryAccess.cpp
 
     ADDITIONAL_HEADER_DIRS
     ${MTAS_SOURCE_DIR}/include/mtas/Dialect/Mt

@@ -7,6 +7,11 @@ mlir_tablegen(InstructionSchedulingInterface.h.inc -gen-op-interface-decls)
 mlir_tablegen(InstructionSchedulingInterface.cpp.inc -gen-op-interface-defs)
 add_public_tablegen_target(MLIRMtInstructionSchedulingInterfaceIncGen)
 
+set(LLVM_TARGET_DEFINITIONS DoubleWordMemoryAccessInterface.td)
+mlir_tablegen(DoubleWordMemoryAccessInterface.h.inc -gen-op-interface-decls)
+mlir_tablegen(DoubleWordMemoryAccessInterface.cpp.inc -gen-op-interface-defs)
+add_public_tablegen_target(MLIRMtDoubleWordMemoryAccessInterfaceIncGen)
+
 set(LLVM_TARGET_DEFINITIONS MtEnums.td)
 mlir_tablegen(MtEnums.h.inc -gen-enum-decls)
 mlir_tablegen(MtEnums.cpp.inc -gen-enum-defs)
