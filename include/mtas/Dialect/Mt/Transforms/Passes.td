@@ -111,4 +111,13 @@ def MergeMemoryAccess : Pass<"merge-memory-access", "func::FuncOp"> {
   ];
 }
 
+def ParameterizeKSize : Pass<"parameterize-k-size", "func::FuncOp"> {
+  let summary = "Parameterize K dimension size by adding function parameter";
+  let constructor = "mlir::mt::createParameterizeKSizePass()";
+  let dependentDialects = [
+    "mt::MtDialect",
+    "ftm::FtmDialect"
+  ];
+}
+
 #endif // MTAS_DIALECT_MT_TRANSFORMS_PASSES

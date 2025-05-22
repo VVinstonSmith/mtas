@@ -67,6 +67,9 @@ std::unique_ptr<Pass> createMtDeadCodeEliminationPass();
 /// Create a pass to merge memory access operations
 std::unique_ptr<Pass> createMergeMemoryAccessPass();
 
+/// Create a pass to parameterize K dimension size by adding function parameter
+std::unique_ptr<Pass> createParameterizeKSizePass();
+
 //===----------------------------------------------------------------------===//
 // Registration
 //===----------------------------------------------------------------------===//

@@ -145,6 +145,17 @@
 //   }
 // }
 
+module {
+  func.func @matmul_only(
+    %A: memref<3x510xf32> {ftm.memory_level = #ftm.memory_level<sm>}, 
+    %B: memref<510x192xf32> {ftm.memory_level = #ftm.memory_level<am>}, 
+    %C: memref<3x192xf32> {ftm.memory_level = #ftm.memory_level<am>})
+  {
+    linalg.matmul {ftm.unroll_loop_number = #ftm.unroll_loop_number<2>} ins(%A, %B : memref<3x510xf32>, memref<510x192xf32>) outs(%C : memref<3x192xf32>)
+    return
+  }
+}
+
 // module {
 //   func.func @matmul_only(
 //     %A: memref<3x512xf32> {ftm.memory_level = #ftm.memory_level<sm>}, 
@@ -266,16 +277,16 @@
 //   }
 // }
 
-module {
-  func.func @matmul_only(
-    %A: memref<6x256xf32> {ftm.memory_level = #ftm.memory_level<sm>}, 
-    %B: memref<256x96xf32> {ftm.memory_level = #ftm.memory_level<am>}, 
-    %C: memref<6x96xf32> {ftm.memory_level = #ftm.memory_level<am>})
-  {
-    linalg.matmul {ftm.unroll_loop_number = #ftm.unroll_loop_number<2>} ins(%A, %B : memref<6x256xf32>, memref<256x96xf32>) outs(%C : memref<6x96xf32>)
-    return
-  }
-}
+// module {
+//   func.func @matmul_only(
+//     %A: memref<6x256xf32> {ftm.memory_level = #ftm.memory_level<sm>}, 
+//     %B: memref<256x96xf32> {ftm.memory_level = #ftm.memory_level<am>}, 
+//     %C: memref<6x96xf32> {ftm.memory_level = #ftm.memory_level<am>})
+//   {
+//     linalg.matmul {ftm.unroll_loop_number = #ftm.unroll_loop_number<2>} ins(%A, %B : memref<6x256xf32>, memref<256x96xf32>) outs(%C : memref<6x96xf32>)
+//     return
+//   }
+// }
 
 // module {
 //   func.func @matmul_only(
