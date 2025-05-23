@@ -77,6 +77,10 @@ def InstructionSchedulingAndPacking : Pass<"instruction-scheduling-and-packing",
   let dependentDialects = [
     "mt::MtDialect"
   ];
+  let options = [
+    Option<"outputFile", "output-file", "std::string", /*default=*/"\"\"",
+           "指定执行包输出文件路径">
+  ];
 }
 
 def MatMulInPlaceAccumulation : Pass<"matmul-in-place-accumulation", "func::FuncOp"> {

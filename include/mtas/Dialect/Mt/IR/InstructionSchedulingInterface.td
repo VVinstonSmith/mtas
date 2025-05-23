@@ -19,6 +19,12 @@ def InstructionSchedulingInterface : OpInterface<"InstructionSchedulingInterface
     // Instruction latency related methods
     InterfaceMethod<"Get the latency (in cycles) of this operation",
                     "int", "getLatency">,
+    // Instruction size related methods
+    InterfaceMethod<"Get the size (in bytes) of this operation",
+                    "int", "getOperationSize", (ins), [{}], /*defaultImplementation=*/[{
+      // Default implementation: operation size is 5 bytes
+      return 5;
+    }]>,
     
     // Register read/write related methods
     InterfaceMethod<"Get all source registers read by this operation",

@@ -123,6 +123,10 @@ int SmoviOp::getLatency(){
   return 1;
 }
 
+int SmoviOp::getOperationSize(){
+  return 10;
+}
+
 llvm::SmallVector<mlir::mt::FunctionalUnit, 2> SmoviOp::getFunctionalUnits() {
   return {mt::FunctionalUnit::SMAC, mt::FunctionalUnit::SIEU};
 }
@@ -159,6 +163,10 @@ llvm::SmallVector<mlir::Value, 2> VmoviOp::getWrittenRegisters(){
 
 int VmoviOp::getLatency(){
   return 1;
+}
+
+int VmoviOp::getOperationSize(){
+  return 10;
 }
 
 llvm::SmallVector<mlir::mt::FunctionalUnit, 2> VmoviOp::getFunctionalUnits() {

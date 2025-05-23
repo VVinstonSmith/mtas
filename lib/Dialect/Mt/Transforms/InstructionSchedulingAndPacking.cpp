@@ -696,6 +696,26 @@ private:
     }
   }
 
+  void adjustPreLoopAlignmentWithSNOP(std::vector<ExecutionPacket> &packetsBeforeLoop,
+      std::vector<ExecutionPacket> &schedulingWindow){
+    // 1. 逆向遍历packetsBeforeLoop，统计其中的指令总长度，也就是循环中第一个指令的地址
+    int loopFirstPacketStartAddr = 0;
+    for(auto it = packetsBeforeLoop.rbegin(); it != packetsBeforeLoop.rend(); ++it){
+      auto& packet = *it;
+      // 处理packet
+      loopFirstPacketStartAddr += packet.calculateInstructionLength();
+    }
+    // 2. 计算循环中第一个指令的末尾的地址
+    int loopFirstPacketEndAddr = loopFirstPacketStartAddr + schedulingWindow[0].calculateInstructionLength() - 1;
+    while(loopFirstPacketStartAddr / 64 != loopFirstPacketEndAddr / 64){
+      // 插入空ExecutionPacket到packetsBeforeLoop的数组首
+      // packetsBeforeLoop.insert(packetsBeforeLoop.begin(), ExecutionPacket());
+      packetsBeforeLoop.push_back(ExecutionPacket());
+      loopFirstPacketStartAddr += 5;
+      loopFirstPacketEndAddr += 5;
+    }
+  }
+
   void insertReturnOp(std::vector<ExecutionPacket> &packetsAfterLoop, func::FuncOp funcOp) {
     // 获取MLIR上下文和位置信息
     MLIRContext *context = funcOp.getContext();
@@ -841,15 +861,20 @@ private:
 
     // 反向调度循环前的操作
     backwardSchedulePreLoopOps(graph, preLoopOps, scheduledOps, packetsBeforeLoop, -1);
+    // 反转packetsBeforeLoop
+    std::reverse(packetsBeforeLoop.begin(), packetsBeforeLoop.end());
+
+    // 计算循环前的指令的长度，判断是否需要插入SNOP，以保证一个基本块的第一个执行包在一个取指包内
+    adjustPreLoopAlignmentWithSNOP(packetsBeforeLoop, schedulingWindow);
 
     // 插入SBR R63
     insertReturnOp(packetsAfterLoop, funcOp);
-    
+
     // 输出完整的调度结果
     llvm::outs() << "调度结果:\n";
-    printSchedulingWindowAsTable(packetsBeforeLoop, true, windowSize - packetsBeforeLoop.size());
-    printSchedulingWindowAsTable(schedulingWindow, false);
-    printSchedulingWindowAsTable(packetsAfterLoop, false);
+    printSchedulingWindowAsTable(packetsBeforeLoop);
+    printSchedulingWindowAsTable(schedulingWindow);
+    printSchedulingWindowAsTable(packetsAfterLoop);
 
     // // std::vector<std::pair<mt::InstructionSchedulingInterface, int>> sortedScheduledOps(scheduledOps.begin(), scheduledOps.end());
     // // // 输出scheduledOps，按照cycle的顺序输出
@@ -864,9 +889,21 @@ private:
     // //   llvm::outs() << "  " << *op.getOperation() << " 被调度到周期 " << cycle << "\n";
     // // }
 
-    // 反转packetsBeforeLoop
-    std::reverse(packetsBeforeLoop.begin(), packetsBeforeLoop.end());
-    printExecutionPackets(packetsBeforeLoop, schedulingWindow, packetsAfterLoop);
+    // 使用 Pass 选项
+    if (!outputFile.empty()) {
+        std::error_code EC;
+        llvm::raw_fd_ostream file(outputFile, EC);
+        if (EC) {
+            llvm::errs() << "无法打开输出文件 " << outputFile << ": " << EC.message() << "\n";
+            printExecutionPackets(packetsBeforeLoop, schedulingWindow, packetsAfterLoop);
+        } else {
+            printExecutionPackets(packetsBeforeLoop, schedulingWindow, packetsAfterLoop, file);
+            file.close();
+            llvm::outs() << "执行包已输出到文件: " << outputFile << "\n";
+        }
+    } else {
+        printExecutionPackets(packetsBeforeLoop, schedulingWindow, packetsAfterLoop);
+    }
   }
 };
 

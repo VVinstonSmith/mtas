@@ -53,6 +53,9 @@ struct ExecutionPacket {
 
   // 格式化输出一个执行包
   void print(raw_ostream &os);
+
+  // 计算执行包中所有操作的总指令长度，如果包为空则返回SNOP长度(5)
+  int calculateInstructionLength();
 };
 
 // 获取操作的简化类型名称

@@ -243,6 +243,40 @@ void ExecutionPacket::print(raw_ostream &os) {
     os << firstPrefix << snopOp << suffix;
   }
 }
+
+int ExecutionPacket::calculateInstructionLength(){
+    int totalLength = 0;
+    
+    // 遍历所有功能单元，累加指令长度
+    // 标量单元
+    for(int i = 0; i < 2; i++) {
+        if(SMAC[i]) {
+            totalLength += SMAC[i].getOperationSize();
+        }
+    }
+
+    if(SIEU){
+      totalLength += isa<mt::SmoviOp>(SIEU) ? 5 : SIEU.getOperationSize();
+    }
+    if(SLDST) totalLength += SLDST.getOperationSize();
+    if(SBR) totalLength += SBR.getOperationSize();
+    
+    // 向量单元
+    for(int i = 0; i < 3; i++) {
+        if(VMAC[i]) {
+            totalLength += VMAC[i].getOperationSize();
+        }
+    }
+    if(VIEU) totalLength += VIEU.getOperationSize();
+    for(int i = 0; i < 2; i++) {
+        if(VLDST[i]) {
+            totalLength += VLDST[i].getOperationSize();
+        }
+    }
+    
+    return totalLength ? totalLength : 5;
+}
+
 std::string mlir::mt::getSimplifiedOpName(InstructionSchedulingInterface op) {
   if (!op) return "-";
   

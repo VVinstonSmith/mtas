@@ -57,6 +57,7 @@ def Mt_SmoviOp :
   let extraClassDeclaration = [{
     // 覆盖 getSchedulingPriority 方法
     int getSchedulingPriority();
+    int getOperationSize();
   }];
 }
 
@@ -69,6 +70,7 @@ def Mt_VmoviOp :
   let extraClassDeclaration = [{
     // 覆盖 getSchedulingPriority 方法
     int getSchedulingPriority();
+    int getOperationSize();
   }];
 }
 
