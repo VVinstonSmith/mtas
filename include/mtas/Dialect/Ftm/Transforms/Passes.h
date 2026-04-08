@@ -40,6 +40,9 @@ std::unique_ptr<Pass> createTileLinalgDimsPass();
 /// Create a pass to unroll the innermost loop
 std::unique_ptr<Pass> createLoopUnrollingPass();
 
+/// Create a pass to fully unroll loops without unroll_factor attribute
+std::unique_ptr<Pass> createFullLoopUnrollingPass();
+
 /// Create a pass to fold loops with static parameters
 std::unique_ptr<Pass> createLoopFoldingPass();
 

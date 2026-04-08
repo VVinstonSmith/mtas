@@ -97,7 +97,7 @@ private:
     windowSizeCandidates.push_back(7); // 跳转指令的延迟
     windowSizeCandidates.push_back(6 * k_size); // 基于 k 维度的大小
     windowSizeCandidates.push_back(k_size * m_size); // 基于VBALE的数量
-    windowSizeCandidates.push_back((k_size * m_size * n_size + 2) / 3); // 基于整体计算量的大小
+    windowSizeCandidates.push_back(k_size * ((m_size * n_size + 2) / 3)); // 基于整体计算量的大小
     return *std::max_element(windowSizeCandidates.begin(), windowSizeCandidates.end());
   }
 
@@ -305,6 +305,7 @@ private:
     // 将循环间真依赖的操作减去窗口大小，因为第一次迭代不需要循环间真依赖的操作
     for(auto op : interTrueDependencyOps){
       scheduledOps[op] += windowSize;
+      llvm::outs() << op << "\n";
     }
       
     // // 将循环中小于迭代窗口的操作加上迭代窗口的大小，记录为第二次迭代
@@ -759,7 +760,8 @@ private:
       if (packetsAfterLoop[i].addOperation(sbrOp)) {
         // llvm::outs() << "SbrRegOp 成功插入到执行包 " << i << "\n";
         // 保证SbrRegOp后面有足够的SNOP（sbrDelay-1个）
-        for(int j = 0; j < i + sbrDelay - packetsAfterLoop.size(); j++){
+        int needInsertNumber = i + sbrDelay - packetsAfterLoop.size();
+        for(int j = 0; j < needInsertNumber; j++){
           packetsAfterLoop.push_back(ExecutionPacket());
         }
         return;

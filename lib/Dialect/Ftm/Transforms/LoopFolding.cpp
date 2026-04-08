@@ -50,8 +50,12 @@ bool applyLoopFolding(scf::ForOp loopOp) {
   else return false;
 
   // 保证k不展开，ij都展开
-  if((upperBound - lowerBound) / loopStep > 18)
+  // if((upperBound - lowerBound) / loopStep > 18)
+  //   return false;
+  // 如果循环有展开因子属性，返回false
+  if(auto attr = loopOp->getAttr(ftm::UnrollFactorAttr::name)) {
     return false;
+  }
 
   builder.setInsertionPoint(loopOp);
   IRMapping mapping;

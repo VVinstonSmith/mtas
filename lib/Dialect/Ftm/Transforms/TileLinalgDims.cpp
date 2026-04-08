@@ -87,7 +87,7 @@ applyTiling(Operation* targetOp,
   }
 
   FailureOr<scf::SCFTilingResult> maybeTilingResult =
-      tileUsingSCFForOp(rewriter, tilingInterface, tilingOptions);
+      tileUsingSCF(rewriter, tilingInterface, tilingOptions);
   if (failed(maybeTilingResult)) {
     llvm::errs() << "fail to tile the target op";
     return {};

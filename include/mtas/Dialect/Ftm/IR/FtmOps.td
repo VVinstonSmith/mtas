@@ -150,6 +150,7 @@ def Ftm_VFMAOp :
   }];
 }
 
+// TODO: 修改为非Pure
 def Ftm_LoadOp : Ftm_Op<"load", [Pure]> {
   let arguments = (ins LLVM_AnyPointer:$addr, Variadic<I64>:$offsetRegister);
   let results = (outs LLVM_LoadableType:$res);
@@ -173,12 +174,13 @@ def Ftm_StoreOp : Ftm_Op<"store"> {
     void getEffects(
         SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>> &
         effects) {
-      effects.emplace_back(MemoryEffects::Write::get(), getAddr(),
+      effects.emplace_back(MemoryEffects::Write::get(),
                            SideEffects::DefaultResource::get());
     }
   }];
 }
 
+// TODO: 修改为非Pure
 def Ftm_LoadImmOp : Ftm_Op<"load_imm", [Pure]> {
   let arguments = (ins LLVM_AnyPointer:$addr, I64Attr:$immOffset);
   let results = (outs LLVM_LoadableType:$res);
@@ -197,7 +199,7 @@ def Ftm_StoreImmOp : Ftm_Op<"store_imm"> {
     void getEffects(
         SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>> &
         effects) {
-      effects.emplace_back(MemoryEffects::Write::get(), getAddr(),
+      effects.emplace_back(MemoryEffects::Write::get(),
                            SideEffects::DefaultResource::get());
     }
   }];

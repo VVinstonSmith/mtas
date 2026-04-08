@@ -50,3 +50,8 @@
     -instruction-scheduling-and-packing  \
     -cse -canonicalize -cse  \
     > ../build/debug_output.log 2>&1
+
+
+# allocate-offset-registers 分配偏移寄存器
+# fix-offset-register-assignment 修复偏移寄存器赋值
+# allocate-address-registers 分配地址寄存器

@@ -3,6 +3,7 @@ add_mlir_dialect_library(MLIRFtmTransforms
     TileLinalgDims.cpp
     LoopUnrolling.cpp
     LoopFolding.cpp
+    FullLoopUnrolling.cpp
     SplitMatmul.cpp
     LowerKernelArguments.cpp
     LowerLinalgOps.cpp

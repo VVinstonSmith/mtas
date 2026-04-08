@@ -363,6 +363,12 @@ void mlir::mt::printExecutionPackets(
     const std::vector<ExecutionPacket>& postLoopOps, 
     raw_ostream &os){
 
+    os << "#include <compiler/m3000.h>\n";
+    os << "#include \"hthread_device.h\"\n\n";
+
+    os << "void matmul_micro_kernel(float* src_a, lvector float* src_b, lvector float* dst_c, const long k_size){\n";
+    os << "    __asm__ __volatile__(\n";
+
     // 遍历preLoopOps
     for(int i = 0; i < preLoopOps.size(); i++){
       auto packet = preLoopOps[i];
@@ -386,4 +392,7 @@ void mlir::mt::printExecutionPackets(
       // 打印packet
       packet.print(os);
     }
+
+    os << "    ::\"r\"(src_a), \"r\"(src_b), \"r\"(dst_c), \"r\"(k_size));\n";
+    os << "}\n";
 }

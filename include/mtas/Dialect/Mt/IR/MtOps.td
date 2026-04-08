@@ -193,33 +193,36 @@ def Mt_SvbcastOp :
 
 def Mt_Vbale2Op :
   Mt_Op<"VBALE2", [
+    AllTypesMatch<["src1", "src2", "dst"]>
   ]>,
   Arguments<(ins VectorOfLengthAndType<[32], [F32]>:$src1,
                  VectorOfLengthAndType<[32], [F32]>:$src2,
                  VectorOfLengthAndType<[32], [F32]>:$dst)> {
   let summary = "This instruction packs the low half-word of source operand Src1 with the low half-word of source operand Src2 into a 64-bit value stored in Dst";
-  let assemblyFormat = "$src1 `,` $src2 `,` $dst attr-dict `:` type($src1) `,` type($src2) `,` type($dst)";
+  let assemblyFormat = "$src1 `,` $src2 `,` $dst attr-dict `:` type($dst)";
 }
 
 def Mt_Vbale2hOp :
   Mt_Op<"VBALE2H", [
+    AllTypesMatch<["src1", "src2", "dst"]>
   ]>,
   Arguments<(ins VectorOfLengthAndType<[32], [F32]>:$src1,
                  VectorOfLengthAndType<[32], [F32]>:$src2,
                  VectorOfLengthAndType<[32], [F32]>:$dst)> {
   let summary = "This instruction packs the high half-word of source operand Src1 with the high half-word of source operand Src2 into a 64-bit value stored in Dst";
-  let assemblyFormat = "$src1 `,` $src2 `,` $dst attr-dict `:` type($src1) `,` type($src2) `,` type($dst)";
+  let assemblyFormat = "$src1 `,` $src2 `,` $dst attr-dict `:` type($dst)";
 }
 
 def Mt_Vfmulas32Op :
   Mt_Op<"VFMULAS32", [
+    AllTypesMatch<["src1", "src2", "src3", "dst"]>
   ]>,
   Arguments<(ins VectorOfLengthAndType<[32], [F32]>:$src1,
                  VectorOfLengthAndType<[32], [F32]>:$src2,
                  VectorOfLengthAndType<[32], [F32]>:$src3,
                  VectorOfLengthAndType<[32], [F32]>:$dst)> {
   let summary = "vector fused multiply-add single precision floating-point operation";
-  let assemblyFormat = "$src1 `,` $src2 `,` $src3 `,` $dst attr-dict `:` type($src1) `,` type($src2) `,` type($src3) `,` type($dst)";
+  let assemblyFormat = "$src1 `,` $src2 `,` $src3 `,` $dst attr-dict `:` type($src1)";
 }
 
 def Mt_SmovOp :

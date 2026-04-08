@@ -106,6 +106,20 @@ def LoopUnrolling : Pass<"loop-unrolling", "func::FuncOp"> {
   ];
 }
 
+def FullLoopUnrolling : Pass<"full-loop-unrolling", "func::FuncOp"> {
+  let summary = "A pass to fully unroll loops without unroll_factor attribute";
+  let description = "This pass identifies loops with ftm.loop_id attribute but without "
+                   "ftm.unroll_factor attribute and completely unrolls them. It processes "
+                   "scf.for loops that have static bounds and fully expands their iterations.";
+  let constructor = "mlir::ftm::createFullLoopUnrollingPass()";
+  let dependentDialects = [
+    "scf::SCFDialect",
+    "memref::MemRefDialect",
+    "arith::ArithDialect",
+    "ftm::FtmDialect",
+  ];
+}
+
 def LoopFolding : Pass<"loop-folding", "func::FuncOp"> {
   let summary = "A pass to fold loops with static parameters";
   let constructor = "mlir::ftm::createLoopFoldingPass()";
